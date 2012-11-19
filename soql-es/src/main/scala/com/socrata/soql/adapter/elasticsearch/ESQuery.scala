@@ -1,0 +1,173 @@
+package com.socrata.soql.adapter.elasticsearch
+
+import com.socrata.soql.typed._
+import com.rojoma.json.ast._
+import com.socrata.soql.adapter.{NotImplementedException, SoqlAdapter}
+import com.socrata.rows.ESHttpGateway
+import com.socrata.collection.{OrderedSet, OrderedMap}
+import com.socrata.soql.names.{FunctionName, ColumnName}
+import com.socrata.soql.types._
+import com.socrata.soql.{SoQLAnalyzer, DatasetContext}
+import com.socrata.soql.typed.OrderBy
+import com.socrata.soql.typed.StringLiteral
+import com.rojoma.json.ast.JObject
+import com.rojoma.json.ast.JArray
+import com.socrata.soql.typed.NumberLiteral
+import com.socrata.soql.typed.ColumnRef
+import com.socrata.soql.typed.FunctionCall
+import com.rojoma.json.ast.JString
+
+class ESQuery(val resource: String) extends SoqlAdapter[String] {
+
+  import ESQuery._
+
+  private val esGateway = new ESHttpGateway(resource)
+  private val dsCtx = esGateway.getDataContext()
+
+  def full(soql: String) = toQuery(dsCtx, soql)
+
+  def select(selection : OrderedMap[ColumnName, TypedFF[SoQLType]]) = ""
+
+  def where(filter: TypedFF[SoQLType], xlateCtx: Map[String, AnyRef]) =
+    toESFilter(filter, xlateCtx).toString()
+
+  def orderBy(orderBys: Seq[OrderBy[SoQLType]]) =
+    toESOrderBy(orderBys).toString()
+
+  def groupBy(groupBys: Seq[TypedFF[SoQLType]], cols: OrderedMap[ColumnName, TypedFF[SoQLType]]) =
+    toESGroupBy(groupBys, cols).toString
+
+  def offset(offset: Option[BigInt]) = offset.map(toESOffset).toString
+
+  def limit(limit: Option[BigInt]) = limit.map(toESLimit).toString
+
+  private def toQuery(datasetCtx: DatasetContext[SoQLType], soql: String): String = {
+    implicit val ctx: DatasetContext[SoQLType] = datasetCtx
+
+    val analyzer = new SoQLAnalyzer(SoQLTypeInfo)
+    val analysis = analyzer.analyzeFullQuery(soql)
+    val esFilter = analysis.where.map(toESFilter(_, Map.empty[String, AnyRef]))
+    val esFilterOrQuery = esFilter.map { filter =>
+    // A top filter apply independently of facets
+    // Must wrap in a query in order to affect facets.
+    // filtered query must have query but we don't use it because it cannot handle and/or.
+    // We fool it be puting match_all there.
+      if (analysis.groupBy.isDefined) JObject(Map("filtered"-> JObject(OrderedMap("query" -> JObject1("match_all", JObject0), "filter" -> filter))))
+      else filter
+    }
+
+    val esObjectPropsSomeValuesMayBeEmpty =
+      OrderedMap(
+        (if (analysis.groupBy.isDefined) "query" else "filter") -> esFilterOrQuery,
+        "sort" -> analysis.orderBy.map(toESOrderBy),
+        "facets" -> analysis.groupBy.map(toESGroupBy(_, analysis.selection)),
+        "from" -> analysis.offset.map(toESOffset),
+        "size" -> analysis.limit.map(toESLimit)
+      )
+
+    val esObjectProps = esObjectPropsSomeValuesMayBeEmpty.collect { case (k, v) if v.isDefined => (k, v.get) }
+    val esObject = JObject(esObjectProps)
+    esObject.toString //.replace("\n", " ")
+  }
+
+  private def toESOffset(offset: BigInt) = JNumber(offset)
+
+  private def toESLimit(limit: BigInt) = JNumber(limit)
+
+  private def toESOrderBy(orderBys: Seq[OrderBy[SoQLType]]): JValue = {
+    JArray(orderBys.map { ob =>
+      ob.expression match {
+        case col: ColumnRef[_] =>
+          JObject(Map(col.column.name -> JString(if (ob.ascending) "asc" else "desc")))
+        case _ =>
+          throw new NotImplementedException("Sort by expressiion is not implemented", ob.expression.position)
+      }
+    })
+  }
+
+  private def toESGroupBy(groupBys: Seq[TypedFF[SoQLType]], cols: OrderedMap[ColumnName, TypedFF[SoQLType]]): JObject = {
+
+    val esGroupBys = groupBys.collect { // ignore expression that aren't simple column
+      case col: ColumnRef[_] =>
+        val aggregateColumns = cols.foldLeft(OrderedSet.empty[ColumnRef[_]]) { (aggregateCols, outputCol) => outputCol match {
+          case (columnName, expr) =>
+            expr match {
+              case FunctionCall(function, (arg : ColumnRef[_]) :: Nil) if function.isAggregate =>
+                aggregateCols + arg
+              case FunctionCall(function, arg) if function.isAggregate =>
+                // require facet script value
+                throw new NotImplementedException("Aggregate on expression not implemented", expr.position)
+              case _ =>
+                // should never happen
+                aggregateCols
+            }
+        }}
+
+        JObject(aggregateColumns.map { aggregateValue =>
+             val facetKeyVal = JObject(Map("key_field" -> JString(col.column.name), "value_field" -> JString(aggregateValue.column.name)))
+             val termsStats = JObject(Map("terms_stats" -> facetKeyVal))
+             val facetName = "fc_%s_%s".format(col.column.name, aggregateValue.column.name)
+             val facet = (facetName, termsStats)
+             facet
+        }.toMap)
+    }
+    if (esGroupBys.size > 1) throw new NotImplementedException("Cannot handle multiple groups", groupBys(1).position)
+    esGroupBys.head
+  }
+
+  private def toESFilter(filter: TypedFF[SoQLType], xlateCtx: Map[String, AnyRef], level: Int = 0): JValue = {
+    val result = filter match {
+      case col: ColumnRef[_] if col.typ == SoQLText =>
+        col.typ match {
+          case x: SoQLNumber.type => JString(col.column.name)
+          case x: SoQLText.type => JString(col.column.name)
+          case x => JString(col.column.name)
+        }
+      case lit: StringLiteral[_] =>
+        JString(lit.value)
+      case lit: NumberLiteral[_] =>
+        JNumber(lit.value)
+      case fn: FunctionCall[_] =>
+        val esFn = fn.function.function match {
+          case SoQLFunctions.Eq  | SoQLFunctions.EqEq => // soql = to adaptor term
+            val cols = fn.parameters.filter{ (param: TypedFF[_]) =>
+              param match {
+                case col: ColumnRef[_] => true
+                case _ => false
+              }}
+            val lits = fn.parameters.filter{ (param: TypedFF[_]) =>
+              param match {
+                case lit: TypedLiteral[_] => true
+                case _ => false
+              }}
+            if (cols.size == 1 && lits.size == 1) {
+              val lhs = toESFilter(cols.head, xlateCtx, level+1)
+              val rhs = toESFilter(lits.head, xlateCtx, level+1)
+              JObject(Map("term" -> JObject(Map(lhs.asInstanceOf[JString].string -> rhs))))
+            } else {
+              // require ES scripted filter
+              throw new NotImplementedException("Only support simple field = literal.",  fn.position)
+            }
+          case SoQLFunctions.And | SoQLFunctions.Or =>
+            val lhs = toESFilter( fn.parameters(0), xlateCtx, level+1)
+            val rhs = toESFilter( fn.parameters(1), xlateCtx, level+1)
+            JObject(Map(fn.function.name.name.substring(3) -> JArray(Seq(lhs, rhs))))
+          case notImplemented =>
+            println(notImplemented.getClass.getName)
+            throw new NotImplementedException("Expression not implemented " + notImplemented.name, fn.functionNamePosition)
+        }
+        esFn
+      case notImplemented =>
+        throw new NotImplementedException("Expression not implemented " + notImplemented.toString, notImplemented.position)
+    }
+
+    result
+  }
+}
+
+object ESQuery {
+
+  private val JObject0 = JObject(Map.empty)
+
+  private def JObject1(k: String, v: JValue): JObject = JObject(Map(k -> v))
+}

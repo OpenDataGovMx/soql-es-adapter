@@ -12,7 +12,6 @@ object BuildSettings {
     version := "0.0.1-SNAPSHOT",
     scalaVersion := "2.9.2",
     resolvers := Seq(
-      "socrata maven snapshots" at "https://repo.socrata.com/artifactory/libs-snapshot",
       "socrata maven" at "https://repo.socrata.com/artifactory/libs-release",
       Resolver.url("socrata ivy", new URL("https://repo.socrata.com/artifactory/ivy-libs-release"))(Resolver.ivyStylePatterns)
     ),

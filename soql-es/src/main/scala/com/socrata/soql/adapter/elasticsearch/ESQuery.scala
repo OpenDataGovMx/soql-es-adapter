@@ -117,7 +117,7 @@ class ESQuery(val resource: String) extends SoqlAdapter[String] {
 
   private def toESFilter(filter: TypedFF[SoQLType], xlateCtx: Map[String, AnyRef], level: Int = 0): JValue = {
     val result = filter match {
-      case col: ColumnRef[_] if col.typ == SoQLText =>
+      case col: ColumnRef[_] =>
         col.typ match {
           case x: SoQLNumber.type => JString(col.column.name)
           case x: SoQLText.type => JString(col.column.name)
@@ -152,6 +152,38 @@ class ESQuery(val resource: String) extends SoqlAdapter[String] {
             val lhs = toESFilter( fn.parameters(0), xlateCtx, level+1)
             val rhs = toESFilter( fn.parameters(1), xlateCtx, level+1)
             JObject(Map(fn.function.name.name.substring(3) -> JArray(Seq(lhs, rhs))))
+          case SoQLFunctions.UnaryMinus =>
+            toESFilter(fn.parameters(0), xlateCtx, level+1) match {
+              case JNumber(x) => JNumber(-x)
+              case JString(x) => JString("-" + x)
+              case x =>
+                throw new Exception("should never get here - negate on " + x.getClass.getName)
+            }
+          case SoQLFunctions.WithinCircle =>
+            val latLon = JObject(Map(
+              "lat" -> toESFilter(fn.parameters(1), xlateCtx, level+1),
+              "lon" -> toESFilter(fn.parameters(2), xlateCtx, level+1)) )
+            JObject1("geo_distance", JObject(Map(
+              "distance" -> toESFilter(fn.parameters(3), xlateCtx, level+1),
+              "location" -> latLon)))
+          case SoQLFunctions.WithinBox =>
+            val nwLatLon = JObject(Map(
+              "lat" -> toESFilter(fn.parameters(1), xlateCtx, level+1),
+              "lon" -> toESFilter(fn.parameters(2), xlateCtx, level+1)) )
+            val seLatLon = JObject(Map(
+              "lat" -> toESFilter(fn.parameters(3), xlateCtx, level+1),
+              "lon" -> toESFilter(fn.parameters(4), xlateCtx, level+1)) )
+            toESFilter(fn.parameters(0), xlateCtx, level+1) match {
+              case JString(locCol) =>
+                JObject1("geo_bounding_box",
+                  JObject1(locCol,
+                    JObject(Map(
+                      "top_left" -> nwLatLon,
+                      "bottom_right" -> seLatLon))))
+              case _ =>
+                throw new NotImplementedException("First argument to within_box must be a location column.", fn.functionNamePosition)
+            }
+
           case notImplemented =>
             println(notImplemented.getClass.getName)
             throw new NotImplementedException("Expression not implemented " + notImplemented.name, fn.functionNamePosition)

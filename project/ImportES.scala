@@ -4,7 +4,7 @@ import Keys._
 import Dependencies._
 
 object ImportES {
-  lazy val settings: Seq[Setting[_]] = BuildSettings.commonProjectSettings() ++ Seq(
+  lazy val settings: Seq[Setting[_]] = BuildSettings.commonProjectSettings(assembly = true) ++ Seq(
     libraryDependencies <++= scalaVersion(libraries(_))
   )
 

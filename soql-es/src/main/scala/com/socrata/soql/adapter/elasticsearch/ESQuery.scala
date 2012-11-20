@@ -159,6 +159,20 @@ class ESQuery(val resource: String) extends SoqlAdapter[String] {
               case x =>
                 throw new Exception("should never get here - negate on " + x.getClass.getName)
             }
+          case SoQLFunctions.In =>
+            toESFilter(fn.parameters.head, xlateCtx, level+1) match {
+              case JString(col) =>
+                JObject1("terms", JObject1(col, JArray(fn.parameters.tail.map(toESFilter(_, xlateCtx, level+1)))))
+              case _ =>
+                throw new NotImplementedException("Lhs of in must be a column.", fn.functionNamePosition)
+            }
+          case SoQLFunctions.NotIn =>
+            toESFilter(fn.parameters.head, xlateCtx, level+1) match {
+              case JString(col) =>
+                JObject1("not", JObject1("terms", JObject1(col, JArray(fn.parameters.tail.map(toESFilter(_, xlateCtx, level+1))))))
+              case _ =>
+                throw new NotImplementedException("Lhs of not in must be a column.", fn.functionNamePosition)
+            }
           case SoQLFunctions.WithinCircle =>
             val latLon = JObject(Map(
               "lat" -> toESFilter(fn.parameters(1), xlateCtx, level+1),
@@ -183,7 +197,6 @@ class ESQuery(val resource: String) extends SoqlAdapter[String] {
               case _ =>
                 throw new NotImplementedException("First argument to within_box must be a location column.", fn.functionNamePosition)
             }
-
           case notImplemented =>
             println(notImplemented.getClass.getName)
             throw new NotImplementedException("Expression not implemented " + notImplemented.name, fn.functionNamePosition)

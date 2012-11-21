@@ -3,7 +3,7 @@ package com.socrata.soql.adapter.elasticsearch
 import com.socrata.soql.typed._
 import com.rojoma.json.ast._
 import com.socrata.soql.adapter.{NotImplementedException, SoqlAdapter}
-import com.socrata.rows.ESHttpGateway
+import com.socrata.rows.{ESGateway, ESHttpGateway}
 import com.socrata.collection.{OrderedSet, OrderedMap}
 import com.socrata.soql.names.{FunctionName, ColumnName}
 import com.socrata.soql.types._
@@ -17,11 +17,10 @@ import com.socrata.soql.typed.ColumnRef
 import com.socrata.soql.typed.FunctionCall
 import com.rojoma.json.ast.JString
 
-class ESQuery(val resource: String) extends SoqlAdapter[String] {
+class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapter[String] {
 
   import ESQuery._
 
-  private val esGateway = new ESHttpGateway(resource)
   private val dsCtx = esGateway.getDataContext()
 
   def full(soql: String) = toQuery(dsCtx, soql)

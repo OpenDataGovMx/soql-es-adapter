@@ -43,8 +43,8 @@ object Main extends App {
   }
 
   private def esSoqlPrompt() {
-    val esGateway = new ESHttpGateway(resource.get)
-    val esQuery = new ESQuery(resource.get)
+    val esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
+    val esQuery = new ESQuery(resource.get, esGateway)
 
     while(true) {
       val cmd = readLine("soql %s >".format(resource.get))

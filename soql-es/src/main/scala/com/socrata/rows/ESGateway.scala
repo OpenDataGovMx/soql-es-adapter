@@ -25,6 +25,8 @@ trait ESGateway {
 
   def updateEsColumnMapping(cols: Map[String, ESColumnMap])
 
+  def getDataContext(): DatasetContext[SoQLType]
+
   def flush(): Unit
 }
 

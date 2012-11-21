@@ -5,6 +5,7 @@ import java.io.{File, FileReader}
 import com.rojoma.simplearm.util._
 import com.socrata.rows.{ESColumnMap, ESHttpGateway}
 import com.socrata.util.strings.CamelCase
+import util.matching.Regex
 
 object ESImport {
 
@@ -15,7 +16,8 @@ object ESImport {
     val esGateway = new ESHttpGateway(resource, batchSize = batchSize, esBaseUrl = es)
 
     using (new CSVReader(fileReader)) { csv =>
-      val headerName: Array[String] = csv.readNext().map(f => CamelCase.decamelize(CamelCase.camelize(f)))
+      val headerName: Array[String] = csv.readNext().map(f =>
+        "[^\\d\\w]".r.replaceAllIn(CamelCase.decamelize(CamelCase.camelize(f)), "_") )
       val headerWithIndex = headerName.zipWithIndex.toMap
       val esColumnMap: Array[ESColumnMap] = columnTypes(fileName, headerName)
 

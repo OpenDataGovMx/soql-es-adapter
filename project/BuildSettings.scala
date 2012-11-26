@@ -10,17 +10,8 @@ import scala.Right
 import scala.Some
 
 object BuildSettings {
-  val buildSettings: Seq[Setting[_]] = Defaults.defaultSettings ++ Seq(
-    organization := "com.socrata",
-    version := "0.0.1-SNAPSHOT",
-    scalaVersion := "2.9.2",
-    resolvers := Seq(
-      "socrata maven" at "https://repo.socrata.com/artifactory/libs-release",
-      Resolver.url("socrata ivy", new URL("https://repo.socrata.com/artifactory/ivy-libs-release"))(Resolver.ivyStylePatterns)
-    ),
-    externalResolvers <<= resolvers map { rs =>
-      Resolver.withDefaultResolvers(rs, mavenCentral = false)
-    }
+  val buildSettings: Seq[Setting[_]] = Defaults.defaultSettings ++ socrataBuildSettings ++ Seq(
+    scalaVersion := "2.9.2"
   )
 
   def commonProjectSettings(assembly: Boolean = false): Seq[Setting[_]] =

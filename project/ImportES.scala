@@ -1,10 +1,11 @@
+import com.socrata.socratasbt.SocrataSbt._
 import sbt._
 import Keys._
 
 import Dependencies._
 
 object ImportES {
-  lazy val settings: Seq[Setting[_]] = BuildSettings.commonProjectSettings(assembly = true) ++ Seq(
+  lazy val settings: Seq[Setting[_]] = BuildSettings.buildSettings ++ socrataProjectSettings(assembly=true) ++ Seq(
     libraryDependencies <++= scalaVersion(libraries(_))
   )
 

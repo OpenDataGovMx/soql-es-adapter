@@ -11,7 +11,7 @@ object BuildSettings {
     scalaVersion := "2.9.2"
   )
 
-  def projectSettings(assembly: Boolean = false) = Defaults.defaultSettings ++ socrataProjectSettings(assembly) ++
+  def projectSettings(assembly: Boolean = false) = buildSettings ++ socrataProjectSettings(assembly) ++
     (if(assembly) Seq(mergeStrategy in AssemblyKeys.assembly ~= mergeStrategies _) else Seq())
 
   def mergeStrategies(originalMergeStrategiesFunc: String => MergeStrategy)(name: String): MergeStrategy = name match {

@@ -42,13 +42,16 @@ object Main extends App {
     }
   }
 
+  sys.exit()
+
   private def esSoqlPrompt() {
     val esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
     val esQuery = new ESQuery(resource.get, esGateway)
 
     while(true) {
-      val cmd = readLine("soql %s >".format(resource.get))
-      if(cmd == null) return
+      val cmd = readLine("soql %s>".format(resource.get))
+      if(cmd == null || cmd.toLowerCase == "exit" || cmd.toLowerCase == "quit")
+        return
       try {
         val qryStr = esQuery.full(cmd)
         println("Elastic Search Query String:\n" + qryStr)
@@ -57,6 +60,8 @@ object Main extends App {
       } catch {
         case e: SoQLException => println(e.getMessage)
         case e: SoQLAdapterException => println(e.getMessage)
+        case e: java.net.ConnectException =>
+          println(e.getMessage + "\nMake sure that elasticsearch server is running.")
       }
     }
   }

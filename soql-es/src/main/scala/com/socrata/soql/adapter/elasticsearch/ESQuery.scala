@@ -21,7 +21,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
 
   import ESQuery._
 
-  private val dsCtx = esGateway.getDataContext()
+  private lazy val dsCtx = esGateway.getDataContext()
 
   def full(soql: String) = toQuery(dsCtx, soql)
 
@@ -43,7 +43,6 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
   private def toQuery(datasetCtx: DatasetContext[SoQLType], soql: String): String = {
     implicit val ctx: DatasetContext[SoQLType] = datasetCtx
 
-    val analyzer = new SoQLAnalyzer(SoQLTypeInfo)
     val analysis = analyzer.analyzeFullQuery(soql)
     val esFilter = analysis.where.map(toESFilter(_, Map.empty[String, AnyRef]))
     val esFilterOrQuery = esFilter.map { filter =>
@@ -55,13 +54,18 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
       else filter
     }
 
+    // For group by, we don't want any individual rows to be returned.  Setting limit to 0 accomplish that.
+    val esLimit =
+      if (analysis.isGrouped) Some(toESLimit(0))
+      else analysis.limit.map(toESLimit)
+
     val esObjectPropsSomeValuesMayBeEmpty =
       OrderedMap(
         (if (analysis.groupBy.isDefined) "query" else "filter") -> esFilterOrQuery,
         "sort" -> analysis.orderBy.map(toESOrderBy),
         "facets" -> analysis.groupBy.map(toESGroupBy(_, analysis.selection)),
         "from" -> analysis.offset.map(toESOffset),
-        "size" -> analysis.limit.map(toESLimit)
+        "size" -> esLimit
       )
 
     val esObjectProps = esObjectPropsSomeValuesMayBeEmpty.collect { case (k, v) if v.isDefined => (k, v.get) }
@@ -214,4 +218,6 @@ object ESQuery {
   private val JObject0 = JObject(Map.empty)
 
   private def JObject1(k: String, v: JValue): JObject = JObject(Map(k -> v))
+
+  private val analyzer = new SoQLAnalyzer(SoQLTypeInfo)
 }

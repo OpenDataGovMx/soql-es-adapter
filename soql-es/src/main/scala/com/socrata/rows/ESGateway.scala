@@ -146,10 +146,15 @@ object ESHttpGateway {
 
   def execute(requestBuilder: AsyncHttpClient#BoundRequestBuilder): String = {
     val rf = requestBuilder.execute()
-    val response: Response = rf.get
-    if (response.getStatusCode < 200 || response.getStatusCode > 299) {
-      throw new InternalException(response.getStatusText)
+    try {
+      val response: Response = rf.get
+      if (response.getStatusCode < 200 || response.getStatusCode > 299) {
+        throw new InternalException(response.getStatusText)
+      }
+      response.getResponseBody
+    } catch {
+      case ex: java.util.concurrent.ExecutionException =>
+        throw ex.getCause
     }
-    response.getResponseBody
   }
 }

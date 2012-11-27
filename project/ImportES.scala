@@ -5,7 +5,7 @@ import Keys._
 import Dependencies._
 
 object ImportES {
-  lazy val settings: Seq[Setting[_]] = BuildSettings.buildSettings ++ socrataProjectSettings(assembly=true) ++ Seq(
+  lazy val settings: Seq[Setting[_]] = BuildSettings.projectSettings(assembly=true) ++ Seq(
     libraryDependencies <++= scalaVersion(libraries(_))
   )
 

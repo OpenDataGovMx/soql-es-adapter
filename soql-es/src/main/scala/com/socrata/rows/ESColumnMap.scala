@@ -39,26 +39,51 @@ object ESColumnMap {
 
   class ESTextLikeColumnMap extends ESColumnMap {
     def toES(data: AnyRef): AnyRef = JString(data.toString)
+
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("string"),
+      "index" -> JString("not_analyzed"),
+      "store" -> JString("yes"),
+      "omit_norms" -> JBoolean(true)
+    ))
   }
 
   class ESNumberLikeColumnMap extends ESTextLikeColumnMap {
-    override def propMap: JValue = JObject(Map("type" -> JString("double")))
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("double"),
+      "store" -> JString("yes"),
+      "omit_norms" -> JBoolean(true)
+    ))
   }
 
   class ESBooleanColumnMap extends ESColumnMap {
-    override def propMap: JValue = JObject(Map("type" -> JString("boolean")))
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("boolean"),
+      "index" -> JString("not_analyzed"),
+      "store" -> JString("no"),
+      "omit_norms" -> JBoolean(true)
+    ))
 
     def toES(data: AnyRef) = JBoolean(DataTypeConverter.cast(data, DataType.Type.CHECKBOX).asInstanceOf[jl.Boolean].booleanValue())
   }
 
   class ESCalendarDateColumnMap extends ESColumnMap {
-    override def propMap: JValue = JObject(Map("type" -> JString("date"), "format" -> JString("dateOptionalTime")))
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("date"),
+      "format" -> JString("dateOptionalTime"),
+      "store" -> JString("no"),
+      "omit_norms" -> JBoolean(true)
+    ))
 
     def toES(data: AnyRef) = JString(DataTypeConverter.cast(data, DataType.Type.CALENDAR_DATE).asInstanceOf[String])
   }
 
   class ESDateColumnMap extends ESColumnMap {
-    override def propMap: JValue = JObject(Map("type" -> JString("date"), "format" -> JString("dateOptionalTime")))
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("date"), "format" -> JString("dateOptionalTime"),
+      "store" -> JString("no"),
+      "omit_norms" -> JBoolean(true)
+    ))
 
     def toES(data: AnyRef): AnyRef = {
       val ts = (DataTypeConverter.cast(data, DataType.Type.DATE).asInstanceOf[java.sql.Timestamp]).getTime
@@ -67,7 +92,11 @@ object ESColumnMap {
   }
 
   class ESLocationColumnMap extends ESColumnMap {
-    override def propMap: JValue = JObject(Map("type" -> JString("geo_point")))
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("geo_point"),
+      "store" -> JString("yes"),
+      "omit_norms" -> JBoolean(true)
+    ))
 
     def toES(data: AnyRef): AnyRef = {
       val loc = data match {

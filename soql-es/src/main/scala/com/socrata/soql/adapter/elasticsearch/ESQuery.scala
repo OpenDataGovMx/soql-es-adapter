@@ -133,23 +133,14 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
       case fn: FunctionCall[_] =>
         val esFn = fn.function.function match {
           case SoQLFunctions.Eq  | SoQLFunctions.EqEq => // soql = to adaptor term
-            val cols = fn.parameters.filter{ (param: TypedFF[_]) =>
-              param match {
-                case col: ColumnRef[_] => true
-                case _ => false
-              }}
-            val lits = fn.parameters.filter{ (param: TypedFF[_]) =>
-              param match {
-                case lit: TypedLiteral[_] => true
-                case _ => false
-              }}
-            if (cols.size == 1 && lits.size == 1) {
-              val lhs = toESFilter(cols.head, xlateCtx, level+1)
-              val rhs = toESFilter(lits.head, xlateCtx, level+1)
-              JObject(Map("term" -> JObject(Map(lhs.asInstanceOf[JString].string -> rhs))))
-            } else {
-              // require ES scripted filter
-              throw new NotImplementedException("Only support simple field = literal.",  fn.position)
+            fn.parameters match {
+              case SimpleColumnLiteralExpression(colLit) =>
+                val lhs = toESFilter(colLit.col, xlateCtx, level+1)
+                val rhs = toESFilter(colLit.lit, xlateCtx, level+1)
+                JObject(Map("term" -> JObject(Map(lhs.asInstanceOf[JString].string -> rhs))))
+              case _ =>
+                // require ES scripted filter
+                throw new NotImplementedException("Only support simple field = literal.",  fn.position)
             }
           case SoQLFunctions.And | SoQLFunctions.Or =>
             val lhs = toESFilter( fn.parameters(0), xlateCtx, level+1)

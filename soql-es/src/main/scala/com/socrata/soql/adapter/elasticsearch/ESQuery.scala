@@ -96,7 +96,9 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
           case (columnName, expr) =>
             expr match {
               case FunctionCall(function, (arg : ColumnRef[_]) :: Nil) if function.isAggregate =>
-                aggregateCols + arg
+                // ColumnRef contains position info which prevents us from directly using ColumnRef equal.
+                if (aggregateCols.find(_.column == arg.column).isDefined) aggregateCols
+                else aggregateCols + arg
               case FunctionCall(function, arg) if function.isAggregate =>
                 // require facet script value
                 throw new NotImplementedException("Aggregate on expression not implemented", expr.position)

@@ -200,6 +200,44 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
               case _ =>
                 throw new NotImplementedException("First argument to within_box must be a location column.", fn.functionNamePosition)
             }
+          case SoQLFunctions.Between =>
+            fn.parameters match {
+              case SimpleColumnLiteralExpression(colLit) if (colLit.lhsIsColumn) =>
+                toESFilter(colLit.col, xlateCtx, level+1) match {
+                  case JString(col) =>
+                    JObject1("range", JObject1(col,
+                      JObject(Map(
+                        "from" -> toESFilter(colLit.lit, xlateCtx, level+1),
+                        "to" -> toESFilter(colLit.lit2.get, xlateCtx, level+1),
+                        "include_upper" -> JBoolean(true),
+                        "include_lower" -> JBoolean(true)))))
+                  case _ =>
+                    throw new NotImplementedException("Expression must be column and literal.", fn.functionNamePosition)
+                }
+              case _ =>
+                throw new NotImplementedException("Expression must be column and literal.", fn.functionNamePosition)
+            }
+          case SoQLFunctions.Lte | SoQLFunctions.Lt | SoQLFunctions.Gte | SoQLFunctions.Gt  =>
+            val inclusive = (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Gte)
+            fn.parameters match {
+              case SimpleColumnLiteralExpression(colLit) =>
+                val lhsIsColumn =
+                  if (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Lt) colLit.lhsIsColumn
+                  else !colLit.lhsIsColumn
+                toESFilter(colLit.col, xlateCtx, level+1) match {
+                  case JString(col) =>
+                    val toOrFrom = if (lhsIsColumn) "to" else "from"
+                    val upperOrLower = if (lhsIsColumn) "include_upper" else "include_lower"
+                    JObject1("range", JObject1(col,
+                        JObject(Map(
+                          toOrFrom -> toESFilter(colLit.lit, xlateCtx, level+1),
+                          upperOrLower -> JBoolean(inclusive)))))
+                  case _ =>
+                    throw new NotImplementedException("Expression must be column and literal.", fn.functionNamePosition)
+                }
+              case _ =>
+                throw new NotImplementedException("Expression must be column and literal.", fn.functionNamePosition)
+            }
           case notImplemented =>
             println(notImplemented.getClass.getName)
             throw new NotImplementedException("Expression not implemented " + notImplemented.name, fn.functionNamePosition)

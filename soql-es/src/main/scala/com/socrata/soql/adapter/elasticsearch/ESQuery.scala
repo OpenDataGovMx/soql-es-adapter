@@ -63,7 +63,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
       OrderedMap(
         (if (analysis.groupBy.isDefined) "query" else "filter") -> esFilterOrQuery,
         "sort" -> analysis.orderBy.map(toESOrderBy),
-        "facets" -> analysis.groupBy.map(toESGroupBy(_, analysis.selection)),
+        "facets" -> analysis.groupBy.map(toESGroupBy(_, analysis.selection, analysis.offset, analysis.limit)),
         "from" -> analysis.offset.map(toESOffset),
         "size" -> esLimit
       )
@@ -88,7 +88,8 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
     })
   }
 
-  private def toESGroupBy(groupBys: Seq[TypedFF[SoQLType]], cols: OrderedMap[ColumnName, TypedFF[SoQLType]]): JObject = {
+  private def toESGroupBy(groupBys: Seq[TypedFF[SoQLType]], cols: OrderedMap[ColumnName, TypedFF[SoQLType]],
+                          offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
     val esGroupBys = groupBys.collect { // ignore expression that aren't simple column
       case col: ColumnRef[_] =>
@@ -116,7 +117,12 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
               // terms stat only works on numeric fields.  Use value script to at least get sensible result for count(text)
               ("value_script", JString("doc[%s].empty ? 0 : 1".format(JString(aggregateValue.column.name))))
           }
-          val facetKeyVal = JObject(Map("key_field" -> JString(col.column.name), facetVal._1 -> facetVal._2))
+          val size: BigInt = if (limit.isEmpty || offset.isEmpty) 0 else limit.get + offset.get
+          val facetKeyVal = JObject(Map(
+            "key_field" -> JString(col.column.name), facetVal._1 -> facetVal._2,
+            "order" -> JString("term"), // TODO - allow different orderings
+            "size" -> JNumber(size)
+          ))
           val termsStats = JObject(Map("terms_stats" -> facetKeyVal))
           val facetName = "fc_%s_%s".format(col.column.name, aggregateValue.column.name)
           val facet = (facetName, termsStats)

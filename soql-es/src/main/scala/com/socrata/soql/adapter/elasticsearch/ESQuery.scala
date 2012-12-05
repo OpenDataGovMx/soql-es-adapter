@@ -218,10 +218,10 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
                         "include_upper" -> JBoolean(true),
                         "include_lower" -> JBoolean(true)))))
                   case _ =>
-                    throw new NotImplementedException("Expression must be column and literal.", fn.functionNamePosition)
+                    toESScriptFilter(filter, xlateCtx, level)
                 }
               case _ =>
-                throw new NotImplementedException("Expression must be column and literal.", fn.functionNamePosition)
+                toESScriptFilter(filter, xlateCtx, level)
             }
           case SoQLFunctions.Lte | SoQLFunctions.Lt | SoQLFunctions.Gte | SoQLFunctions.Gt  =>
             val inclusive = (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Gte)
@@ -239,10 +239,10 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
                           toOrFrom -> toESFilter(colLit.lit, xlateCtx, level+1),
                           upperOrLower -> JBoolean(inclusive)))))
                   case _ =>
-                    throw new NotImplementedException("Expression must be column and literal.", fn.functionNamePosition)
+                    toESScriptFilter(filter, xlateCtx, level)
                 }
               case _ =>
-                throw new NotImplementedException("Expression must be column and literal.", fn.functionNamePosition)
+                toESScriptFilter(filter, xlateCtx, level)
             }
           case notImplemented =>
             println(notImplemented.getClass.getName)
@@ -257,6 +257,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
   }
 
   private def toESScriptFilter(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0): JValue = {
+    log.info("switch to script filter: " + filter.toString())
     val (js, ctx) = toESScript(filter, xlateCtx, level)
     JObject1("script", JObject(Map(
       // if ESLang is not set, we use default mvel.  Some expressions like casting require js
@@ -286,6 +287,9 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
                SoQLFunctions.And | SoQLFunctions.Or |
                SoQLFunctions.BinaryMinus | SoQLFunctions.BinaryPlus |
                SoQLFunctions.TimesNumNum | SoQLFunctions.DivNumNum |
+               SoQLFunctions.Gt | SoQLFunctions.Gte |
+               SoQLFunctions.Lt | SoQLFunctions.Lte |
+               SoQLFunctions.Neq| SoQLFunctions.BangEq |
                SoQLFunctions.Concat =>
             ("(%s %s %s)".format(scriptedParams(0), scriptFnMap(fn.function.name), scriptedParams(1)), childrenCtx)
           case SoQLFunctions.UnaryMinus =>
@@ -296,6 +300,8 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
           case SoQLFunctions.NumberToText =>
             val castExpr = "%s.toString()".format(scriptedParams(0))
             (castExpr, childrenCtx + requireJS)
+          case SoQLFunctions.Between =>
+            ("(%1$s >= %2$s && %1$s <= %3$s)".format(scriptedParams(0), scriptedParams(1), scriptedParams(2)), childrenCtx)
           case notImplemented =>
             println(notImplemented.getClass.getName)
             throw new NotImplementedException("Expression not implemented " + notImplemented.name, fn.functionNamePosition)
@@ -311,6 +317,8 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
 
 object ESQuery {
 
+  private val log = org.slf4j.LoggerFactory.getLogger(classOf[ESQuery])
+
   private val JObject0 = JObject(Map.empty)
 
   private def JObject1(k: String, v: JValue): JObject = JObject(Map(k -> v))
@@ -323,6 +331,13 @@ object ESQuery {
     SoQLFunctions.And.name -> "&&",
     SoQLFunctions.Or.name -> "||",
     SoQLFunctions.Concat.name -> "+",
+
+    SoQLFunctions.Gt.name -> ">",
+    SoQLFunctions.Gte.name -> ">=",
+    SoQLFunctions.Lt.name -> "<",
+    SoQLFunctions.Lte.name -> "<=",
+    SoQLFunctions.Neq.name -> "!=",
+    SoQLFunctions.BangEq.name -> "!=",
 
     SoQLFunctions.TimesNumNum.name -> "*",
     SoQLFunctions.DivNumNum.name -> "/",

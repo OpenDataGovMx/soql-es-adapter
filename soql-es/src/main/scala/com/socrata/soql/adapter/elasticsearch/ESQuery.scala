@@ -2,7 +2,7 @@ package com.socrata.soql.adapter.elasticsearch
 
 import com.socrata.soql.typed._
 import com.rojoma.json.ast._
-import com.socrata.soql.adapter.{NotImplementedException, SoqlAdapter}
+import com.socrata.soql.adapter.{XlateCtx, NotImplementedException, SoqlAdapter}
 import com.socrata.rows.{ESGateway, ESHttpGateway}
 import com.socrata.collection.{OrderedSet, OrderedMap}
 import com.socrata.soql.names.{FunctionName, ColumnName}
@@ -27,7 +27,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
 
   def select(selection : OrderedMap[ColumnName, TypedFF[SoQLType]]) = ""
 
-  def where(filter: TypedFF[SoQLType], xlateCtx: Map[String, AnyRef]) =
+  def where(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef] = Map.empty) =
     toESFilter(filter, xlateCtx).toString()
 
   def orderBy(orderBys: Seq[OrderBy[SoQLType]]) =
@@ -44,7 +44,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
     implicit val ctx: DatasetContext[SoQLType] = datasetCtx
 
     val analysis = analyzer.analyzeFullQuery(soql)
-    val esFilter = analysis.where.map(toESFilter(_, Map.empty[String, AnyRef]))
+    val esFilter = analysis.where.map(toESFilter(_, Map.empty[XlateCtx.Value, AnyRef]))
     val esFilterOrQuery = esFilter.map { filter =>
     // A top filter apply independently of facets
     // Must wrap in a query in order to affect facets.
@@ -133,7 +133,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
     esGroupBys.head
   }
 
-  private def toESFilter(filter: TypedFF[SoQLType], xlateCtx: Map[String, AnyRef], level: Int = 0): JValue = {
+  private def toESFilter(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0): JValue = {
     val result = filter match {
       case col: ColumnRef[_] =>
         col.typ match {
@@ -155,7 +155,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
                 JObject(Map("term" -> JObject(Map(lhs.asInstanceOf[JString].string -> rhs))))
               case _ =>
                 // require ES scripted filter
-                throw new NotImplementedException("Only support simple field = literal.",  fn.position)
+                toESScriptFilter(filter, xlateCtx, level)
             }
           case SoQLFunctions.And | SoQLFunctions.Or =>
             val lhs = toESFilter( fn.parameters(0), xlateCtx, level+1)
@@ -255,6 +255,58 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
 
     result
   }
+
+  private def toESScriptFilter(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0): JValue = {
+    val (js, ctx) = toESScript(filter, xlateCtx, level)
+    JObject1("script", JObject(Map(
+      // if ESLang is not set, we use default mvel.  Some expressions like casting require js
+      "lang" -> JString(ctx.getOrElse(XlateCtx.ESLang, "mvel").asInstanceOf[String]),
+      "script" -> JString(js)
+    )))
+  }
+
+  private def toESScript(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
+    Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
+
+    val requireJS = (XlateCtx.ESLang -> "js")
+
+    val result = filter match {
+      case col: ColumnRef[_] =>
+        ("doc['%s'].value".format(col.column.name), xlateCtx)
+      case lit: StringLiteral[_] =>
+        (JString(lit.value).toString, xlateCtx)
+      case lit: NumberLiteral[_] =>
+        (JNumber(lit.value).toString, xlateCtx)
+      case fn: FunctionCall[_] =>
+        val children = fn.parameters.map(toESScript(_, xlateCtx, level+1))
+        val scriptedParams = children.map( x => x._1)
+        val childrenCtx = children.foldLeft(xlateCtx) { (x, y) => x ++ y._2}
+        val esFn = fn.function.function match {
+          case SoQLFunctions.Eq  | SoQLFunctions.EqEq |
+               SoQLFunctions.And | SoQLFunctions.Or |
+               SoQLFunctions.BinaryMinus | SoQLFunctions.BinaryPlus |
+               SoQLFunctions.TimesNumNum | SoQLFunctions.DivNumNum |
+               SoQLFunctions.Concat =>
+            ("(%s %s %s)".format(scriptedParams(0), scriptFnMap(fn.function.name), scriptedParams(1)), childrenCtx)
+          case SoQLFunctions.UnaryMinus =>
+            ("-" + scriptedParams(0), childrenCtx)
+          case SoQLFunctions.TextToNumber =>
+            val castExpr = "parseFloat(%s)".format(scriptedParams(0))
+            (castExpr, childrenCtx + requireJS)
+          case SoQLFunctions.NumberToText =>
+            val castExpr = "%s.toString()".format(scriptedParams(0))
+            (castExpr, childrenCtx + requireJS)
+          case notImplemented =>
+            println(notImplemented.getClass.getName)
+            throw new NotImplementedException("Expression not implemented " + notImplemented.name, fn.functionNamePosition)
+        }
+        esFn
+      case notImplemented =>
+        throw new NotImplementedException("Expression not implemented " + notImplemented.toString, notImplemented.position)
+    }
+
+    result
+  }
 }
 
 object ESQuery {
@@ -264,4 +316,17 @@ object ESQuery {
   private def JObject1(k: String, v: JValue): JObject = JObject(Map(k -> v))
 
   private val analyzer = new SoQLAnalyzer(SoQLTypeInfo)
+
+  private val scriptFnMap = Map(
+    SoQLFunctions.Eq.name -> "==",
+    SoQLFunctions.EqEq.name -> "==",
+    SoQLFunctions.And.name -> "&&",
+    SoQLFunctions.Or.name -> "||",
+    SoQLFunctions.Concat.name -> "+",
+
+    SoQLFunctions.TimesNumNum.name -> "*",
+    SoQLFunctions.DivNumNum.name -> "/",
+    SoQLFunctions.BinaryMinus.name -> "-",
+    SoQLFunctions.BinaryPlus.name -> "+"
+  )
 }

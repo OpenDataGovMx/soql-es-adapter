@@ -302,6 +302,64 @@ class ESQueryTest extends FunSuite with MustMatchers {
         }
       """))
   }
+
+  test("mixed script/non-script or mixed script langs") {
+    toEsQuery("select * where updated_on is null") must equal(json(
+      """
+        { "filter" : { "missing" : { "field" : "updated_on" } } }
+      """))
+
+    toEsQuery("select * where updated_on is not null") must equal(json(
+      """
+        { "filter" : { "exists" : { "field" : "updated_on" } } }
+      """))
+
+    toEsQuery("select * where case_number = 'HP109135' or id = year") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "or" :
+                [
+                  { "term" : { "case_number" : "HP109135" } },
+                  {
+                    "script" :
+                      {
+                        "lang" : "mvel",
+                        "script" : "(doc['id'].value == doc['year'].value)"
+                      }
+                  }
+                ]
+            }
+        }
+      """))
+
+    toEsQuery("select * where id = year or year::text = '2010'") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "or" :
+                [
+                  {
+                    "script" :
+                      {
+                        "lang" : "mvel",
+                        "script" : "(doc['id'].value == doc['year'].value)"
+                      }
+                  },
+                  {
+                    "script" :
+                      {
+                        "lang" : "js",
+                        "script" : "(doc['year'].value.toString() == \"2010\")"
+                      }
+                  }
+                ]
+            }
+        }
+      """))
+  }
 }
 
 object ESQueryTest {

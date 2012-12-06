@@ -16,6 +16,7 @@ import com.socrata.soql.typed.NumberLiteral
 import com.socrata.soql.typed.ColumnRef
 import com.socrata.soql.typed.FunctionCall
 import com.rojoma.json.ast.JString
+import com.socrata.soql.functions.MonomorphicFunction
 
 class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapter[String] {
 
@@ -145,6 +146,10 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
         JString(lit.value)
       case lit: NumberLiteral[_] =>
         JNumber(lit.value)
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNull, _), (col: ColumnRef[_]) :: Nil) =>
+        JObject1("missing", JObject1("field", toESFilter(col, xlateCtx, level+1)))
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNotNull, _), (col: ColumnRef[_]) :: Nil) =>
+        JObject1("exists", JObject1("field", toESFilter(col, xlateCtx, level+1)))
       case fn: FunctionCall[_] =>
         val esFn = fn.function.function match {
           case SoQLFunctions.Eq  | SoQLFunctions.EqEq => // soql = to adaptor term
@@ -157,6 +162,9 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
                 // require ES scripted filter
                 toESScriptFilter(filter, xlateCtx, level)
             }
+          case SoQLFunctions.Neq | SoQLFunctions.BangEq =>
+            val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Eq, fn.function.bindings), fn.parameters)
+            JObject1("not", toESFilter(deNegFn, xlateCtx, level+1))
           case SoQLFunctions.And | SoQLFunctions.Or =>
             val lhs = toESFilter( fn.parameters(0), xlateCtx, level+1)
             val rhs = toESFilter( fn.parameters(1), xlateCtx, level+1)
@@ -278,6 +286,10 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
         (JString(lit.value).toString, xlateCtx)
       case lit: NumberLiteral[_] =>
         (JNumber(lit.value).toString, xlateCtx)
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNull, _), (col: ColumnRef[_]) :: Nil) =>
+        ("doc['%s'].empty".format(col.column.name), xlateCtx)
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNotNull, _), (col: ColumnRef[_]) :: Nil) =>
+        ("doc['%s'].empty".format(col.column.name), xlateCtx)
       case fn: FunctionCall[_] =>
         val children = fn.parameters.map(toESScript(_, xlateCtx, level+1))
         val scriptedParams = children.map( x => x._1)

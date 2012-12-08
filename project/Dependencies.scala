@@ -11,6 +11,7 @@ object Dependencies {
     val scalaCheck_28 = "1.8"
     val scalaCheck_29 = "1.10.0"
     val scalaTest = "1.8"
+    val simpleArm = "1.1.10"
     val slf4j = "1.6.6"
     val socrataCoreMisc = "1.2.4"
     val socrataUtils = "0.5.0"
@@ -30,6 +31,8 @@ object Dependencies {
   val rojomaJson = "com.rojoma" %% "rojoma-json" % versions.rojomaJson
 
   val scalaTest = "org.scalatest" %% "scalatest" % versions.scalaTest
+
+  val simpleArm = "com.rojoma" %% "simple-arm" % versions.simpleArm
 
   val slf4j = "org.slf4j" % "slf4j-api" % versions.slf4j
 

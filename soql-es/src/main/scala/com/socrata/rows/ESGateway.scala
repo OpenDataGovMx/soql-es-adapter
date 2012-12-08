@@ -11,6 +11,7 @@ import com.socrata.soql.DatasetContext
 import com.socrata.soql.types.SoQLType
 import com.rojoma.json.util.JsonUtil
 import com.socrata.json.codec.elasticsearch.DatasetContextCodec
+import java.io.InputStream
 
 trait ESGateway {
   def addRow(data: Map[String, AnyRef])
@@ -99,9 +100,9 @@ class ESHttpGateway(val esIndex: String, val esType: String = "data",
     execute(Client.prepareGet(url))
   }
 
-  def search(query: String): String = {
+  def search(query: String): InputStream = {
     val url = "%1$s/_search?pretty=true".format(esDsUrl)
-    execute(Client.preparePost(url).setBody(query))
+    getResponse(Client.preparePost(url).setBody(query)).getResponseBodyAsStream
   }
 
   def updateEsColumnMapping(cols: Map[String, ESColumnMap]) {
@@ -144,17 +145,21 @@ object ESHttpGateway {
 
   private val IdDateFormat = new SimpleDateFormat("yyMMddHHmmssSSS")
 
-  def execute(requestBuilder: AsyncHttpClient#BoundRequestBuilder): String = {
+  def getResponse(requestBuilder: AsyncHttpClient#BoundRequestBuilder): Response = {
     val rf = requestBuilder.execute()
     try {
-      val response: Response = rf.get
+      val response: Response = rf.get()
       if (response.getStatusCode < 200 || response.getStatusCode > 299) {
         throw new InternalException(response.getStatusText)
       }
-      response.getResponseBody
+      response
     } catch {
       case ex: java.util.concurrent.ExecutionException =>
         throw ex.getCause
     }
+  }
+
+  def execute(requestBuilder: AsyncHttpClient#BoundRequestBuilder): String = {
+    getResponse(requestBuilder).getResponseBody()
   }
 }

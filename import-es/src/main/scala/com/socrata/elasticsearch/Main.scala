@@ -3,11 +3,13 @@ package com.socrata.elasticsearch
 import org.apache.commons.cli.Options
 import org.apache.commons.cli.CommandLineParser
 import org.apache.commons.cli.PosixParser
+import com.rojoma.simplearm.util._
 import com.socrata.injest.ESImport
 import com.socrata.rows.ESHttpGateway
-import com.socrata.soql.adapter.elasticsearch.ESQuery
+import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
 import com.socrata.soql.exceptions.SoQLException
 import com.socrata.soql.adapter.SoQLAdapterException
+import java.io.InputStream
 
 object Main extends App {
 
@@ -54,9 +56,13 @@ object Main extends App {
         return
       try {
         val qryStr = esQuery.full(cmd)
-        println("Elastic Search Query String:\n" + qryStr)
-        val result = esGateway.search(qryStr)
-        println("Result:\n" + result)
+        println("\nElastic Search Query String:\n" + qryStr)
+
+        using(esGateway.search(qryStr)) { inputStream: InputStream =>
+          val rowStream = new ESResultSet(inputStream).rowStream()
+          println("\nResults:")
+          println(rowStream.mkString("[", ",", "]"))
+        }
       } catch {
         case e: SoQLException => println(e.getMessage)
         case e: SoQLAdapterException => println(e.getMessage)

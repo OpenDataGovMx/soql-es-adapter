@@ -14,6 +14,7 @@ object ImportES {
     commonsCli,
     opencsv,
     rojomaJson,
+    simpleArm,
     slf4jSimple,
     socrataBlistMisc,
     socrataCoreMisc,

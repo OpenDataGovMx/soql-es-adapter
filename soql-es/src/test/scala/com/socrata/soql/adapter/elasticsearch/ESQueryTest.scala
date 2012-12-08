@@ -191,6 +191,23 @@ class ESQueryTest extends FunSuite with MustMatchers {
           "size" : 0
         }
       """))
+
+    toEsQuery("select * where not (case_number = 'HP109135' or case_number = 'HP110029')") must equal(json(
+      """
+       {
+          "filter" :
+            {
+              "not" :
+                {
+                  "or" :
+                    [
+                      { "term" : { "case_number" : "HP109135" } },
+                      { "term" : { "case_number" : "HP110029" } }
+                    ]
+                }
+            }
+       }
+      """))
   }
 
   test("require mvel (default) scripted filter") {

@@ -150,6 +150,8 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
         JObject1("missing", JObject1("field", toESFilter(col, xlateCtx, level+1)))
       case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNotNull, _), (col: ColumnRef[_]) :: Nil) =>
         JObject1("exists", JObject1("field", toESFilter(col, xlateCtx, level+1)))
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.Not, _), arg :: Nil) =>
+        JObject1("not", toESFilter(arg, xlateCtx, level+1))
       case fn: FunctionCall[_] =>
         val esFn = fn.function.function match {
           case SoQLFunctions.Eq  | SoQLFunctions.EqEq => // soql = to adaptor term
@@ -290,6 +292,9 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
         ("doc['%s'].empty".format(col.column.name), xlateCtx)
       case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNotNull, _), (col: ColumnRef[_]) :: Nil) =>
         ("doc['%s'].empty".format(col.column.name), xlateCtx)
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.Not, _), arg :: Nil) =>
+        val children = toESScript(arg, xlateCtx, level+1)
+        ("(!%s)".format(toESScript(arg, xlateCtx, level+1)), children._2)
       case fn: FunctionCall[_] =>
         val children = fn.parameters.map(toESScript(_, xlateCtx, level+1))
         val scriptedParams = children.map( x => x._1)

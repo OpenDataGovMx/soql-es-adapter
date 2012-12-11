@@ -139,7 +139,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
             },
           "facets" :
             {
-              "fc_primary_type_id" :
+              "fc:primary_type:id" :
                 {
                   "terms_stats" :
                     {
@@ -166,7 +166,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
             },
           "facets" :
             {
-              "fc_primary_type_case_number" :
+              "fc:primary_type:case_number" :
                 {
                   "terms_stats" :
                     {
@@ -176,7 +176,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
                       "size" : 4
                     }
                 },
-              "fc_primary_type_id" :
+              "fc:primary_type:id" :
                 {
                   "terms_stats" :
                     {
@@ -383,7 +383,7 @@ object ESQueryTest {
   val esGateway = new ESTestGateway()
   val esQuery = new ESQuery("visitors", esGateway)
 
-  def toEsQuery(soql: String): Any = esQuery.full(soql)
+  def toEsQuery(soql: String): Any = esQuery.full(soql)._1
 
   def json(json: String) = (new JsonReader(json)).read().toString
 }

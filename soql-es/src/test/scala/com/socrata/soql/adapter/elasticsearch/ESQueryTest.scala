@@ -87,6 +87,28 @@ class ESQueryTest extends FunSuite with MustMatchers {
           "size" : 3
         }
       """))
+    toEsQuery("select * where id not between 6006000 and 6006999 limit 3") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "not" :
+              {
+                "range" :
+                {
+                  "id" :
+                  {
+                    "from" : 6006000,
+                    "to" : 6006999,
+                    "include_upper" : true,
+                    "include_lower" : true
+                  }
+                }
+              }
+            },
+          "size" : 3
+        }
+      """))
     toEsQuery("select * where (2005 = year and primary_type = 'THEFT') or (year = 2006 and primary_type = 'BATTERY')") must equal(json(
       """
         {
@@ -316,6 +338,30 @@ class ESQueryTest extends FunSuite with MustMatchers {
                   "script" : "(doc['year'].value.toString() == (\"20\" + \"00\"))"
                 }
             }
+        }
+      """))
+    toEsQuery("select * where case_number in ( 'HP109135', 'HP' || '110029')") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "script" :
+                {
+                  "lang" : "mvel",
+                  "script" : "((doc['case_number'].value == \"HP109135\") || (doc['case_number'].value == (\"HP\" + \"110029\")))"
+                }
+            }
+        }
+      """))
+    toEsQuery("select * where 'HP109135' in ('HP109135') limit 2") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "script" :
+                { "lang" : "mvel", "script" : "((\"HP109135\" == \"HP109135\"))" }
+            },
+          "size" : 2
         }
       """))
   }

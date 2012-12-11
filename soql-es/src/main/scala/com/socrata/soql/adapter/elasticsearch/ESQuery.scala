@@ -2,7 +2,7 @@ package com.socrata.soql.adapter.elasticsearch
 
 import com.socrata.soql.typed._
 import com.rojoma.json.ast._
-import com.socrata.soql.adapter.{XlateCtx, NotImplementedException, SoqlAdapter}
+import com.socrata.soql.adapter.{SoQLAdapterException, XlateCtx, NotImplementedException, SoqlAdapter}
 import com.socrata.rows.{ESGateway, ESHttpGateway}
 import com.socrata.collection.{OrderedSet, OrderedMap}
 import com.socrata.soql.names.{FunctionName, ColumnName}
@@ -17,8 +17,11 @@ import com.socrata.soql.typed.ColumnRef
 import com.socrata.soql.typed.FunctionCall
 import com.rojoma.json.ast.JString
 import com.socrata.soql.functions.MonomorphicFunction
+import util.parsing.input.Position
 
 class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapter[String] {
+
+  class RequireScriptFilter(message: String, position: Position) extends SoQLAdapterException(message, position)
 
   import ESQuery._
 
@@ -29,7 +32,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
   def select(selection : OrderedMap[ColumnName, TypedFF[SoQLType]]) = ""
 
   def where(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef] = Map.empty) =
-    toESFilter(filter, xlateCtx).toString()
+    toESFilter(filter, xlateCtx, canScript = true).toString()
 
   def orderBy(orderBys: Seq[OrderBy[SoQLType]]) =
     toESOrderBy(orderBys).toString()
@@ -45,7 +48,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
     implicit val ctx: DatasetContext[SoQLType] = datasetCtx
 
     val analysis = analyzer.analyzeFullQuery(soql)
-    val esFilter = analysis.where.map(toESFilter(_, Map.empty[XlateCtx.Value, AnyRef]))
+    val esFilter = analysis.where.map(toESFilter(_, Map.empty[XlateCtx.Value, AnyRef], canScript = true))
     val esFilterOrQuery = esFilter.map { filter =>
     // A top filter apply independently of facets
     // Must wrap in a query in order to affect facets.
@@ -134,136 +137,139 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
     esGroupBys.head
   }
 
-  private def toESFilter(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0): JValue = {
-    val result = filter match {
-      case col: ColumnRef[_] =>
-        col.typ match {
-          case x: SoQLNumber.type => JString(col.column.name)
-          case x: SoQLText.type => JString(col.column.name)
-          case x => JString(col.column.name)
-        }
-      case lit: StringLiteral[_] =>
-        JString(lit.value)
-      case lit: NumberLiteral[_] =>
-        JNumber(lit.value)
-      case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNull, _), (col: ColumnRef[_]) :: Nil) =>
-        JObject1("missing", JObject1("field", toESFilter(col, xlateCtx, level+1)))
-      case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNotNull, _), (col: ColumnRef[_]) :: Nil) =>
-        JObject1("exists", JObject1("field", toESFilter(col, xlateCtx, level+1)))
-      case FunctionCall(MonomorphicFunction(SoQLFunctions.Not, _), arg :: Nil) =>
-        JObject1("not", toESFilter(arg, xlateCtx, level+1))
-      case fn: FunctionCall[_] =>
-        val esFn = fn.function.function match {
-          case SoQLFunctions.Eq  | SoQLFunctions.EqEq => // soql = to adaptor term
-            fn.parameters match {
-              case SimpleColumnLiteralExpression(colLit) =>
-                val lhs = toESFilter(colLit.col, xlateCtx, level+1)
-                val rhs = toESFilter(colLit.lit, xlateCtx, level+1)
-                JObject(Map("term" -> JObject(Map(lhs.asInstanceOf[JString].string -> rhs))))
-              case _ =>
-                // require ES scripted filter
-                toESScriptFilter(filter, xlateCtx, level)
-            }
-          case SoQLFunctions.Neq | SoQLFunctions.BangEq =>
-            val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Eq, fn.function.bindings), fn.parameters)
-            JObject1("not", toESFilter(deNegFn, xlateCtx, level+1))
-          case SoQLFunctions.And | SoQLFunctions.Or =>
-            val lhs = toESFilter( fn.parameters(0), xlateCtx, level+1)
-            val rhs = toESFilter( fn.parameters(1), xlateCtx, level+1)
-            JObject(Map(fn.function.name.name.substring(3) -> JArray(Seq(lhs, rhs))))
-          case SoQLFunctions.UnaryMinus =>
-            toESFilter(fn.parameters(0), xlateCtx, level+1) match {
-              case JNumber(x) => JNumber(-x)
-              case JString(x) => JString("-" + x)
-              case x =>
-                throw new Exception("should never get here - negate on " + x.getClass.getName)
-            }
-          case SoQLFunctions.In =>
-            toESFilter(fn.parameters.head, xlateCtx, level+1) match {
-              case JString(col) =>
-                JObject1("terms", JObject1(col, JArray(fn.parameters.tail.map(toESFilter(_, xlateCtx, level+1)))))
-              case _ =>
-                throw new NotImplementedException("Lhs of in must be a column.", fn.functionNamePosition)
-            }
-          case SoQLFunctions.NotIn =>
-            toESFilter(fn.parameters.head, xlateCtx, level+1) match {
-              case JString(col) =>
-                JObject1("not", JObject1("terms", JObject1(col, JArray(fn.parameters.tail.map(toESFilter(_, xlateCtx, level+1))))))
-              case _ =>
-                throw new NotImplementedException("Lhs of not in must be a column.", fn.functionNamePosition)
-            }
-          case SoQLFunctions.WithinCircle =>
-            val latLon = JObject(Map(
-              "lat" -> toESFilter(fn.parameters(1), xlateCtx, level+1),
-              "lon" -> toESFilter(fn.parameters(2), xlateCtx, level+1)) )
-            JObject1("geo_distance", JObject(Map(
-              "distance" -> toESFilter(fn.parameters(3), xlateCtx, level+1),
-              "location" -> latLon)))
-          case SoQLFunctions.WithinBox =>
-            val nwLatLon = JObject(Map(
-              "lat" -> toESFilter(fn.parameters(1), xlateCtx, level+1),
-              "lon" -> toESFilter(fn.parameters(2), xlateCtx, level+1)) )
-            val seLatLon = JObject(Map(
-              "lat" -> toESFilter(fn.parameters(3), xlateCtx, level+1),
-              "lon" -> toESFilter(fn.parameters(4), xlateCtx, level+1)) )
-            toESFilter(fn.parameters(0), xlateCtx, level+1) match {
-              case JString(locCol) =>
-                JObject1("geo_bounding_box",
-                  JObject1(locCol,
-                    JObject(Map(
-                      "top_left" -> nwLatLon,
-                      "bottom_right" -> seLatLon))))
-              case _ =>
-                throw new NotImplementedException("First argument to within_box must be a location column.", fn.functionNamePosition)
-            }
-          case SoQLFunctions.Between =>
-            fn.parameters match {
-              case SimpleColumnLiteralExpression(colLit) if (colLit.lhsIsColumn) =>
-                toESFilter(colLit.col, xlateCtx, level+1) match {
-                  case JString(col) =>
-                    JObject1("range", JObject1(col,
+  private def toESFilter(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+    try {
+      val result = filter match {
+        case col: ColumnRef[_] =>
+          col.typ match {
+            case x: SoQLNumber.type => JString(col.column.name)
+            case x: SoQLText.type => JString(col.column.name)
+            case x => JString(col.column.name)
+          }
+        case lit: StringLiteral[_] =>
+          JString(lit.value)
+        case lit: NumberLiteral[_] =>
+          JNumber(lit.value)
+        case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNull, _), (col: ColumnRef[_]) :: Nil) =>
+          JObject1("missing", JObject1("field", toESFilter(col, xlateCtx, level+1)))
+        case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNotNull, _), (col: ColumnRef[_]) :: Nil) =>
+          JObject1("exists", JObject1("field", toESFilter(col, xlateCtx, level+1)))
+        case FunctionCall(MonomorphicFunction(SoQLFunctions.Not, _), arg :: Nil) =>
+          JObject1("not", toESFilter(arg, xlateCtx, level+1, canScript))
+        case FunctionCall(MonomorphicFunction(SoQLFunctions.In, _), (col: ColumnRef[_]) :: args) =>
+          toESFilter(col, xlateCtx, level + 1) match {
+            case JString(col) => JObject1("terms", JObject1(col, JArray(args.map(toESFilter(_, xlateCtx, level+1)))))
+            case _ => throw new Exception("should never happen")
+          }
+        case fn@FunctionCall(MonomorphicFunction(SoQLFunctions.NotIn, _), (col: ColumnRef[_]) :: args) =>
+          val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)
+          JObject1("not", toESFilter(deNegFn, xlateCtx, level, canScript))
+        case fn: FunctionCall[_] =>
+          val esFn = fn.function.function match {
+            case SoQLFunctions.Eq  | SoQLFunctions.EqEq => // soql = to adaptor term
+              fn.parameters match {
+                case SimpleColumnLiteralExpression(colLit) =>
+                  val lhs = toESFilter(colLit.col, xlateCtx, level+1)
+                  val rhs = toESFilter(colLit.lit, xlateCtx, level+1)
+                  JObject(Map("term" -> JObject(Map(lhs.asInstanceOf[JString].string -> rhs))))
+                case _ =>
+                  // require ES scripted filter
+                  toESScriptFilter(filter, xlateCtx, level)
+              }
+            case SoQLFunctions.Neq | SoQLFunctions.BangEq =>
+              val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Eq, fn.function.bindings), fn.parameters)
+              JObject1("not", toESFilter(deNegFn, xlateCtx, level+1, canScript))
+            case SoQLFunctions.And | SoQLFunctions.Or =>
+              val lhs = toESFilter( fn.parameters(0), xlateCtx, level+1, canScript)
+              val rhs = toESFilter( fn.parameters(1), xlateCtx, level+1, canScript)
+              JObject(Map(fn.function.name.name.substring(3) -> JArray(Seq(lhs, rhs))))
+            case SoQLFunctions.UnaryMinus =>
+              toESFilter(fn.parameters(0), xlateCtx, level+1) match {
+                case JNumber(x) => JNumber(-x)
+                case JString(x) => JString("-" + x)
+                case x =>
+                  throw new Exception("should never get here - negate on " + x.getClass.getName)
+              }
+            case SoQLFunctions.NotBetween =>
+              val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Between, fn.function.bindings), fn.parameters)
+              JObject1("not", toESFilter(deNegFn, xlateCtx, level+1))
+            case SoQLFunctions.WithinCircle =>
+              val latLon = JObject(Map(
+                "lat" -> toESFilter(fn.parameters(1), xlateCtx, level+1),
+                "lon" -> toESFilter(fn.parameters(2), xlateCtx, level+1)) )
+              JObject1("geo_distance", JObject(Map(
+                "distance" -> toESFilter(fn.parameters(3), xlateCtx, level+1),
+                "location" -> latLon)))
+            case SoQLFunctions.WithinBox =>
+              val nwLatLon = JObject(Map(
+                "lat" -> toESFilter(fn.parameters(1), xlateCtx, level+1),
+                "lon" -> toESFilter(fn.parameters(2), xlateCtx, level+1)) )
+              val seLatLon = JObject(Map(
+                "lat" -> toESFilter(fn.parameters(3), xlateCtx, level+1),
+                "lon" -> toESFilter(fn.parameters(4), xlateCtx, level+1)) )
+              toESFilter(fn.parameters(0), xlateCtx, level+1) match {
+                case JString(locCol) =>
+                  JObject1("geo_bounding_box",
+                    JObject1(locCol,
                       JObject(Map(
-                        "from" -> toESFilter(colLit.lit, xlateCtx, level+1),
-                        "to" -> toESFilter(colLit.lit2.get, xlateCtx, level+1),
-                        "include_upper" -> JBoolean(true),
-                        "include_lower" -> JBoolean(true)))))
-                  case _ =>
-                    toESScriptFilter(filter, xlateCtx, level)
-                }
-              case _ =>
-                toESScriptFilter(filter, xlateCtx, level)
-            }
-          case SoQLFunctions.Lte | SoQLFunctions.Lt | SoQLFunctions.Gte | SoQLFunctions.Gt  =>
-            val inclusive = (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Gte)
-            fn.parameters match {
-              case SimpleColumnLiteralExpression(colLit) =>
-                val lhsIsColumn =
-                  if (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Lt) colLit.lhsIsColumn
-                  else !colLit.lhsIsColumn
-                toESFilter(colLit.col, xlateCtx, level+1) match {
-                  case JString(col) =>
-                    val toOrFrom = if (lhsIsColumn) "to" else "from"
-                    val upperOrLower = if (lhsIsColumn) "include_upper" else "include_lower"
-                    JObject1("range", JObject1(col,
+                        "top_left" -> nwLatLon,
+                        "bottom_right" -> seLatLon))))
+                case _ =>
+                  throw new NotImplementedException("First argument to within_box must be a location column.", fn.functionNamePosition)
+              }
+            case SoQLFunctions.Between =>
+              fn.parameters match {
+                case SimpleColumnLiteralExpression(colLit) if (colLit.lhsIsColumn) =>
+                  toESFilter(colLit.col, xlateCtx, level+1) match {
+                    case JString(col) =>
+                      JObject1("range", JObject1(col,
                         JObject(Map(
-                          toOrFrom -> toESFilter(colLit.lit, xlateCtx, level+1),
-                          upperOrLower -> JBoolean(inclusive)))))
-                  case _ =>
-                    toESScriptFilter(filter, xlateCtx, level)
-                }
-              case _ =>
-                toESScriptFilter(filter, xlateCtx, level)
-            }
-          case notImplemented =>
-            println(notImplemented.getClass.getName)
-            throw new NotImplementedException("Expression not implemented " + notImplemented.name, fn.functionNamePosition)
-        }
-        esFn
-      case notImplemented =>
-        throw new NotImplementedException("Expression not implemented " + notImplemented.toString, notImplemented.position)
-    }
+                          "from" -> toESFilter(colLit.lit, xlateCtx, level+1),
+                          "to" -> toESFilter(colLit.lit2.get, xlateCtx, level+1),
+                          "include_upper" -> JBoolean(true),
+                          "include_lower" -> JBoolean(true)))))
+                    case _ =>
+                      toESScriptFilter(filter, xlateCtx, level)
+                  }
+                case _ =>
+                  toESScriptFilter(filter, xlateCtx, level)
+              }
+            case SoQLFunctions.Lte | SoQLFunctions.Lt | SoQLFunctions.Gte | SoQLFunctions.Gt  =>
+              val inclusive = (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Gte)
+              fn.parameters match {
+                case SimpleColumnLiteralExpression(colLit) =>
+                  val lhsIsColumn =
+                    if (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Lt) colLit.lhsIsColumn
+                    else !colLit.lhsIsColumn
+                  toESFilter(colLit.col, xlateCtx, level+1) match {
+                    case JString(col) =>
+                      val toOrFrom = if (lhsIsColumn) "to" else "from"
+                      val upperOrLower = if (lhsIsColumn) "include_upper" else "include_lower"
+                      JObject1("range", JObject1(col,
+                          JObject(Map(
+                            toOrFrom -> toESFilter(colLit.lit, xlateCtx, level+1),
+                            upperOrLower -> JBoolean(inclusive)))))
+                    case _ =>
+                      toESScriptFilter(filter, xlateCtx, level)
+                  }
+                case _ =>
+                  toESScriptFilter(filter, xlateCtx, level)
+              }
+            case notImplemented =>
+              throw new RequireScriptFilter("Require script filter", fn.functionNamePosition)
+          }
+          esFn
+        case notImplemented =>
+          throw new RequireScriptFilter("Require script filter", filter.position)
+      }
 
-    result
+      result
+    } catch {
+      case ex: RequireScriptFilter =>
+        if (canScript) toESScriptFilter(filter, xlateCtx, level)
+        else if (level > 0) throw ex
+        else throw new NotImplementedException("Expression not implemented", ex.position)
+    }
   }
 
   private def toESScriptFilter(filter: TypedFF[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0): JValue = {
@@ -319,6 +325,20 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
             (castExpr, childrenCtx + requireJS)
           case SoQLFunctions.Between =>
             ("(%1$s >= %2$s && %1$s <= %3$s)".format(scriptedParams(0), scriptedParams(1), scriptedParams(2)), childrenCtx)
+          case SoQLFunctions.NotBetween =>
+            val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Between, fn.function.bindings), fn.parameters)
+            val children = toESScript(deNegFn, xlateCtx, level+1)
+            ("(!%s)".format(children._1), children._2)
+          case SoQLFunctions.In =>
+            val (lhs, lhsCtx) = toESScript(fn.parameters.head, xlateCtx, level+1)
+            val rhss = fn.parameters.tail.map(toESScript(_, xlateCtx, level+1))
+            val childrenCtx = rhss.foldLeft(lhsCtx) { (accCtx, rhs) => accCtx ++ rhs._2 }
+            val script = rhss.map( rhs => "(%s == %s)".format(lhs, rhs._1)).mkString("(", " || ", ")")
+            (script, childrenCtx)
+          case SoQLFunctions.NotIn =>
+            val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)
+            val children = toESScript(deNegFn, xlateCtx, level+1)
+            ("(!%s)".format(children._1), children._2)
           case notImplemented =>
             println(notImplemented.getClass.getName)
             throw new NotImplementedException("Expression not implemented " + notImplemented.name, fn.functionNamePosition)

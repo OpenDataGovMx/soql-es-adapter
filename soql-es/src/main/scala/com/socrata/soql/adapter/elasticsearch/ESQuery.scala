@@ -41,7 +41,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
 
   def limit(limit: Option[BigInt]) = limit.map(toESLimit).toString
 
-  private def toQuery(datasetCtx: DatasetContext[SoQLType], soql: String): String = {
+  private def toQuery(datasetCtx: DatasetContext[SoQLType], soql: String): Tuple2[String, SoQLAnalyzer[SoQLType]#Analysis] = {
     implicit val ctx: DatasetContext[SoQLType] = datasetCtx
 
     val analysis = analyzer.analyzeFullQuery(soql)
@@ -71,7 +71,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
 
     val esObjectProps = esObjectPropsSomeValuesMayBeEmpty.collect { case (k, v) if v.isDefined => (k, v.get) }
     val esObject = JObject(esObjectProps)
-    esObject.toString //.replace("\n", " ")
+    Tuple2(esObject.toString, analysis) //.replace("\n", " ")
   }
 
   private def toESOffset(offset: BigInt) = JNumber(offset)
@@ -125,8 +125,8 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
             "size" -> JNumber(size)
           ))
           val termsStats = JObject(Map("terms_stats" -> facetKeyVal))
-          val facetName = "fc_%s_%s".format(col.column.name, aggregateValue.column.name)
-          val facet = (facetName, termsStats)
+          val facetName = FacetName(col.column.name, aggregateValue.column.name)
+          val facet = (facetName.toString(), termsStats)
           facet
         }.toMap)
     }

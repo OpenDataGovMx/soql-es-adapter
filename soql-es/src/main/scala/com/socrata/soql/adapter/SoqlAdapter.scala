@@ -5,6 +5,7 @@ import com.socrata.soql.types.SoQLType
 import com.socrata.collection.OrderedMap
 import com.socrata.soql.names.ColumnName
 import util.parsing.input.Position
+import com.socrata.soql.SoQLAnalyzer
 
 class SoQLAdapterException(val message: String, val position: Position) extends Exception(message + "\n" + position.longString)
 
@@ -12,7 +13,7 @@ class NotImplementedException(m: String, p: Position) extends SoQLAdapterExcepti
 
 trait SoqlAdapter[T] {
 
-  def full(soql: String): T
+  def full(soql: String): Tuple2[T, SoQLAnalyzer[SoQLType]#Analysis]
 
   def select(selection : OrderedMap[ColumnName, TypedFF[SoQLType]]): T
 

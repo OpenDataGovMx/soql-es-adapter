@@ -55,11 +55,11 @@ object Main extends App {
       if(cmd == null || cmd.toLowerCase == "exit" || cmd.toLowerCase == "quit")
         return
       try {
-        val qryStr = esQuery.full(cmd)
-        println("\nElastic Search Query String:\n" + qryStr)
+        val qryConversionResult = esQuery.full(cmd)
+        println("\nElastic Search Query String:\n" + qryConversionResult._1)
 
-        using(esGateway.search(qryStr)) { inputStream: InputStream =>
-          val rowStream = new ESResultSet(inputStream).rowStream()
+        using(esGateway.search(qryConversionResult._1)) { inputStream: InputStream =>
+          val rowStream = ESResultSet.parser(qryConversionResult._2.isGrouped, inputStream).rowStream()
           println("\nResults:")
           println(rowStream.mkString("[", ",", "]"))
         }

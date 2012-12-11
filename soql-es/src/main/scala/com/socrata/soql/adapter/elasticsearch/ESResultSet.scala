@@ -13,18 +13,26 @@ class ESJsonBadParse(event: JsonEvent, expect: JsonEvent) extends
   def position = event.position
 }
 
+trait ESResultSet {
 
-class ESResultSet(inputStream: InputStream, charset: Charset = Charset.forName("UTF-8")) {
+  protected val lexer: JsonEventIterator
+
+  protected val jsonReader: JsonReader
+
+  def rowStream(): Stream[JObject]
+}
+
+class ESPlainResultSet(inputStream: InputStream, charset: Charset) extends ESResultSet {
 
   import ESResultSet._
 
-  private val reader = new InputStreamReader(inputStream, charset)
+  protected val reader = new InputStreamReader(inputStream, charset)
 
-  private val tokenIter = new JsonTokenIterator(reader)
+  protected val tokenIter = new JsonTokenIterator(reader)
 
-  private val lexer = new JsonEventIterator(tokenIter)
+  protected val lexer = new JsonEventIterator(tokenIter)
 
-  private val jsonReader = new JsonReader(lexer)
+  protected val jsonReader = new JsonReader(lexer)
 
   def rowStream(): Stream[JObject] = {
     skipToField(lexer, Seq("hits", "hits"))
@@ -37,7 +45,7 @@ class ESResultSet(inputStream: InputStream, charset: Charset = Charset.forName("
     }
   }
 
-  private def resultStream(reader: JsonReader): Stream[JObject] = {
+  protected def resultStream(reader: JsonReader): Stream[JObject] = {
     if (reader.lexer.head.isInstanceOf[EndOfArrayEvent]) Stream.empty
     else
       reader.read() match {
@@ -54,8 +62,12 @@ class ESResultSet(inputStream: InputStream, charset: Charset = Charset.forName("
 
 object ESResultSet {
 
+  def parser(isGrouped: Boolean, inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8): ESResultSet =
+    if (isGrouped) new ESGroupingResultSet(inputStream, charset)
+    else new ESPlainResultSet(inputStream, charset)
+
   @tailrec
-  private def skipToField(lexer: JsonEventIterator, field: String): Boolean = {
+  def skipToField(lexer: JsonEventIterator, field: String): Boolean = {
     if (!lexer.hasNext) false
     else lexer.next() match {
       case FieldEvent(s) if (s == field) =>
@@ -69,7 +81,7 @@ object ESResultSet {
   }
 
   @tailrec
-  private def skipToField(lexer: JsonEventIterator, fields: Seq[String]): Boolean = {
+  def skipToField(lexer: JsonEventIterator, fields: Seq[String]): Boolean = {
     fields match {
       case h :: t =>
         skipToField(lexer, h)

@@ -3,9 +3,9 @@ package com.socrata.soql.adapter.elasticsearch
 import com.rojoma.json.ast._
 import com.rojoma.json.ast.JObject
 import com.rojoma.json.ast.JString
+import com.socrata.soql.adapter.{SoQLAdapterException, NotImplementedException, XlateCtx}
 import com.socrata.soql.typed._
 import com.socrata.soql.types._
-import com.socrata.soql.adapter.{SoQLAdapterException, NotImplementedException, XlateCtx}
 import com.socrata.soql.typed.StringLiteral
 import com.socrata.soql.typed.BooleanLiteral
 import com.socrata.soql.typed.NullLiteral
@@ -90,6 +90,8 @@ case class ESFunctionCall[T](fn: FunctionCall[T]) extends ESFilter {
       case MonomorphicFunction(SoQLFunctions.Lte, _) => lgte(fn, xlateCtx, level, canScript)
       case MonomorphicFunction(SoQLFunctions.Gt, _) => lgte(fn, xlateCtx, level, canScript)
       case MonomorphicFunction(SoQLFunctions.Gte, _) => lgte(fn, xlateCtx, level, canScript)
+      case MonomorphicFunction(SoQLFunctions.Like, _) => like(fn, xlateCtx, level, canScript)
+      case MonomorphicFunction(SoQLFunctions.NotLike, _) => notLike(fn, xlateCtx, level, canScript)
       case _ =>
         throw new RequireScriptFilter("Require script filter", fn.position)
     }

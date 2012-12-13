@@ -53,10 +53,10 @@ object ESFunction {
 
   def in[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: args =>
+      case (col: ColumnRef[_]) :: params =>
         ESTypedFF(col).toFilter(xlateCtx, level + 1) match {
           case JString(col) =>
-            JObject1("terms", JObject1(col, JArray(args.map( a => ESTypedFF(a).toFilter(xlateCtx, level+1)))))
+            JObject1("terms", JObject1(col, JArray(params.map( a => ESTypedFF(a).toFilter(xlateCtx, level+1)))))
           case _ => throw new Exception("should never happen")
         }
       case _ => throw new RequireScriptFilter("Require script filter", fn.position)
@@ -65,7 +65,7 @@ object ESFunction {
 
   def notIn[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: args =>
+      case (col: ColumnRef[_]) :: _ =>
         val fnc = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)
         val deNegFn = ESFunctionCall(fnc)
         JObject1("not", deNegFn.toFilter(xlateCtx, level, canScript))
@@ -117,7 +117,6 @@ object ESFunction {
       "location" -> latLon)))
   }
 
-
   def withinBox[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val nwLatLon = JObject(Map(
       "lat" -> ESTypedFF(fn.parameters(1)).toFilter(xlateCtx, level+1),
@@ -154,6 +153,9 @@ object ESFunction {
     }
   }
 
+  /**
+   * Handle >, >=, <, <=
+   */
   def lgte[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val inclusive = (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Gte)
     fn.parameters match {
@@ -173,5 +175,27 @@ object ESFunction {
         }
       case _ => throw new RequireScriptFilter("Require script filter", fn.position)
     }
+  }
+
+  def like[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+    fn.parameters match {
+      case (col: ColumnRef[_]) :: (lit: StringLiteral[_]) :: _ =>
+        ESTypedFF(col).toFilter(xlateCtx, level+1) match {
+          case JString(col) =>
+            val startsWithRx = """([^\%]+)[\%]""".r
+            lit.value match {
+              case startsWithRx(s) => JObject1("prefix", JObject1(col, JString(s)))
+              case wildCard => JObject1("query", JObject1("wildcard", JObject1(col,
+                JString(lit.value.replace("*", "").replace("%", "*")))))
+            }
+          case _ => throw new Exception("should never get here, %s".format(fn.function.name))
+        }
+      case _ => throw new RequireScriptFilter("Require script filter", fn.position)
+    }
+  }
+
+  def notLike[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Like, fn.function.bindings), fn.parameters)
+    JObject1("not", ESFunctionCall(deNegFn).toFilter(xlateCtx, level+1, canScript))
   }
 }

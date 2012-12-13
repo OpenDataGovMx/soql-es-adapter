@@ -230,6 +230,26 @@ class ESQueryTest extends FunSuite with MustMatchers {
             }
        }
       """))
+
+    toEsQuery("select * where case_number like 'HP%'") must equal (json(
+      """
+        { "filter" : { "prefix" : { "case_number" : "HP" } } }
+      """))
+
+    toEsQuery("select * where case_number like 'HP%123%'") must equal (json(
+      """
+        { "filter" : { "query" : { "wildcard" : { "case_number" : "HP*123*" } } } }
+      """))
+
+    toEsQuery("select * where updated_on is null") must equal(json(
+      """
+        { "filter" : { "missing" : { "field" : "updated_on" } } }
+      """))
+
+    toEsQuery("select * where updated_on is not null") must equal(json(
+      """
+        { "filter" : { "exists" : { "field" : "updated_on" } } }
+      """))
   }
 
   test("require mvel (default) scripted filter") {
@@ -309,9 +329,31 @@ class ESQueryTest extends FunSuite with MustMatchers {
             }
         }
       """))
+    toEsQuery("select * where case_number in ( 'HP109135', 'HP' || '110029')") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "script" :
+                {
+                  "lang" : "mvel",
+                  "script" : "((doc['case_number'].value == \"HP109135\") || (doc['case_number'].value == (\"HP\" + \"110029\")))"
+                }
+            }
+        }
+      """))
+    toEsQuery("select * where 'HP109135' in ('HP109135') limit 2") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "script" :
+                { "lang" : "mvel", "script" : "((\"HP109135\" == \"HP109135\"))" }
+            },
+          "size" : 2
+        }
+      """))
   }
-
-
 
   test("require javascript scripted filter") {
     toEsQuery("select * where fbi_code::number = id") must equal(json(
@@ -340,42 +382,9 @@ class ESQueryTest extends FunSuite with MustMatchers {
             }
         }
       """))
-    toEsQuery("select * where case_number in ( 'HP109135', 'HP' || '110029')") must equal(json(
-      """
-        {
-          "filter" :
-            {
-              "script" :
-                {
-                  "lang" : "mvel",
-                  "script" : "((doc['case_number'].value == \"HP109135\") || (doc['case_number'].value == (\"HP\" + \"110029\")))"
-                }
-            }
-        }
-      """))
-    toEsQuery("select * where 'HP109135' in ('HP109135') limit 2") must equal(json(
-      """
-        {
-          "filter" :
-            {
-              "script" :
-                { "lang" : "mvel", "script" : "((\"HP109135\" == \"HP109135\"))" }
-            },
-          "size" : 2
-        }
-      """))
   }
 
   test("mixed script/non-script or mixed script langs") {
-    toEsQuery("select * where updated_on is null") must equal(json(
-      """
-        { "filter" : { "missing" : { "field" : "updated_on" } } }
-      """))
-
-    toEsQuery("select * where updated_on is not null") must equal(json(
-      """
-        { "filter" : { "exists" : { "field" : "updated_on" } } }
-      """))
 
     toEsQuery("select * where case_number = 'HP109135' or id = year") must equal(json(
       """

@@ -1,6 +1,9 @@
 package com.socrata.soql.adapter.elasticsearch
 
-import com.socrata.soql.typed.{TypedLiteral, ColumnRef, TypedFF}
+import com.socrata.soql.typed._
+import com.socrata.soql.functions.MonomorphicFunction
+import com.socrata.soql.types.SoQLFunctions
+import annotation.tailrec
 
 /** *
   * Many times, stores can only handle expressions where lhs is column and rhs is literal.
@@ -30,15 +33,25 @@ object SimpleColumnLiteralExpression {
     exprs._1.size == 1 && exprs._2.size >= 1 && exprs._3.isEmpty
   }
 
+  @tailrec
+  private def considerLiteral[T](expr: TypedFF[T]): Boolean = {
+    expr match {
+      case _ : TypedLiteral[_] => true
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.TextToFloatingTimestamp, _), arg :: Nil) =>
+        considerLiteral(arg)
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.TextToFixedTimestamp, _), arg :: Nil) =>
+        considerLiteral(arg)
+      case _ => false
+    }
+  }
+
   /**
    * Partition expression into 3 types - columns, literal and compounds.
    */
   private def partitionExprs[T](exprs: Seq[TypedFF[T]]) = {
-    val colsAndNonCols = exprs.partition(_.isInstanceOf[ColumnRef[_]])
-    val litsAndNonLits = colsAndNonCols._2.partition(_.isInstanceOf[TypedLiteral[_]])
-    val cols = colsAndNonCols._1
-    val lits = litsAndNonLits._1
-    val cpounds = litsAndNonLits._2
+
+    val (cols, nonCols) = exprs.partition(_.isInstanceOf[ColumnRef[_]])
+    val (lits, cpounds) = nonCols.partition(considerLiteral(_))
     Tuple3(cols, lits, cpounds)
   }
 }

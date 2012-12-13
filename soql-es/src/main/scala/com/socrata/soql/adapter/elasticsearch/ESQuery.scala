@@ -18,6 +18,8 @@ import com.socrata.soql.typed.FunctionCall
 import com.rojoma.json.ast.JString
 import com.socrata.soql.functions.MonomorphicFunction
 import util.parsing.input.Position
+import com.blist.rows.format.DataTypeConverter
+import com.blist.models.views.DataType
 
 class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapter[String] {
 
@@ -150,6 +152,9 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
           JString(lit.value)
         case lit: NumberLiteral[_] =>
           JNumber(lit.value)
+        case FunctionCall(MonomorphicFunction(SoQLFunctions.TextToFloatingTimestamp, _), (param: StringLiteral[_]) :: Nil) =>
+          val dateLit = StringLiteral(DataTypeConverter.cast(param.value, DataType.Type.CALENDAR_DATE).asInstanceOf[String], SoQLType)
+          toESFilter(dateLit.asInstanceOf[TypedFF[SoQLType]], xlateCtx, level + 1)
         case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNull, _), (col: ColumnRef[_]) :: Nil) =>
           JObject1("missing", JObject1("field", toESFilter(col, xlateCtx, level+1)))
         case FunctionCall(MonomorphicFunction(SoQLFunctions.IsNotNull, _), (col: ColumnRef[_]) :: Nil) =>
@@ -321,7 +326,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
             val castExpr = "parseFloat(%s)".format(scriptedParams(0))
             (castExpr, childrenCtx + requireJS)
           case SoQLFunctions.NumberToText =>
-            val castExpr = "%s.toString()".format(scriptedParams(0))
+            val castExpr = "(%s).toString()".format(scriptedParams(0))
             (castExpr, childrenCtx + requireJS)
           case SoQLFunctions.Between =>
             ("(%1$s >= %2$s && %1$s <= %3$s)".format(scriptedParams(0), scriptedParams(1), scriptedParams(2)), childrenCtx)

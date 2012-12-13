@@ -335,7 +335,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
               "script" :
                 {
                   "lang" : "js",
-                  "script" : "(doc['year'].value.toString() == (\"20\" + \"00\"))"
+                  "script" : "((doc['year'].value).toString() == (\"20\" + \"00\"))"
                 }
             }
         }
@@ -415,7 +415,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
                     "script" :
                       {
                         "lang" : "js",
-                        "script" : "(doc['year'].value.toString() == \"2010\")"
+                        "script" : "((doc['year'].value).toString() == \"2010\")"
                       }
                   }
                 ]

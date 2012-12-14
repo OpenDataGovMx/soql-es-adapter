@@ -76,7 +76,7 @@ case class ESFunctionCall[T](fn: FunctionCall[T]) extends ESFilter {
       case MonomorphicFunction(SoQLFunctions.NotIn, _) => notIn(fn, xlateCtx, level, canScript)
       case MonomorphicFunction(SoQLFunctions.Eq, _) => equ(fn, xlateCtx, level, canScript)
       case MonomorphicFunction(SoQLFunctions.EqEq, _) => equ(fn, xlateCtx, level, canScript)
-      case MonomorphicFunction(SoQLFunctions.TextToFixedTimestamp, _) => textToFloatingTimestamp(fn, xlateCtx, level, canScript)
+      case MonomorphicFunction(SoQLFunctions.TextToFloatingTimestamp, _) => textToFloatingTimestamp(fn, xlateCtx, level, canScript)
       case MonomorphicFunction(SoQLFunctions.Neq, _) => neq(fn, xlateCtx, level, canScript)
       case MonomorphicFunction(SoQLFunctions.BangEq, _) => neq(fn, xlateCtx, level, canScript)
       case MonomorphicFunction(SoQLFunctions.And, _) => andOr(fn, xlateCtx, level, canScript)

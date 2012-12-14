@@ -432,6 +432,45 @@ class ESQueryTest extends FunSuite with MustMatchers {
         }
       """))
   }
+
+  test("support of standalone boolean column") {
+    toEsQuery("select * where arrest") must equal(json(
+      """{ "filter" : { "term" : { "arrest" : true } } }"""))
+
+    toEsQuery("select * where arrest = false") must equal(json(
+      """{ "filter" : { "term" : { "arrest" : false } } }"""))
+
+    toEsQuery("select * where not arrest") must equal(json(
+      """{ "filter" : { "not" : { "term" : { "arrest" : true } } } }"""))
+
+    toEsQuery("select * where  case_number = 'HP109135' or arrest") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "or" :
+                [
+                  { "term" : { "case_number" : "HP109135" } },
+                  { "term" : { "arrest" : true } }
+                ]
+            }
+        }
+      """.stripMargin))
+
+    toEsQuery("select * where not arrest and case_number = 'HP109135'") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "and" :
+                [
+                  { "not" : { "term" : { "arrest" : true } } },
+                  { "term" : { "case_number" : "HP109135" } }
+                ]
+            }
+        }
+      """.stripMargin))
+  }
 }
 
 object ESQueryTest {

@@ -4,7 +4,8 @@ import com.socrata.soql.adapter.{NotImplementedException, XlateCtx}
 import com.rojoma.json.ast._
 import com.blist.rows.format.DataTypeConverter
 import com.blist.models.views.DataType
-import com.socrata.soql.types.{SoQLFunctions, SoQLType}
+import com.socrata.soql.types.{SoQLBoolean, SoQLFunctions, SoQLType}
+import com.socrata.soql.typed._
 import com.socrata.soql.typed.StringLiteral
 import com.rojoma.json.ast.JObject
 import com.rojoma.json.ast.JBoolean
@@ -46,7 +47,7 @@ object ESFunction {
   def not[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case arg :: Nil =>
-        JObject1("not", ESTypedFF(arg).toFilter(xlateCtx, level+1, canScript))
+        JObject1("not", ESTypedFF(arg).toFilter(xlateCtx, zeroStandaloneBooleanLevel(arg, level+1), canScript))
       case _  => throw new RequireScriptFilter("Require script filter", fn.position)
     }
   }
@@ -90,8 +91,10 @@ object ESFunction {
   }
 
   def andOr[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
-    val lhs = ESTypedFF(fn.parameters(0)).toFilter(xlateCtx, level+1, canScript)
-    val rhs = ESTypedFF(fn.parameters(1)).toFilter(xlateCtx, level+1, canScript)
+    val l = fn.parameters(0)
+    val r = fn.parameters(1)
+    val lhs = ESTypedFF(l).toFilter(xlateCtx, zeroStandaloneBooleanLevel(l, level+1), canScript)
+    val rhs = ESTypedFF(r).toFilter(xlateCtx, zeroStandaloneBooleanLevel(r, level+1), canScript)
     JObject(Map(fn.function.name.name.substring(3) -> JArray(Seq(lhs, rhs))))
   }
 
@@ -197,5 +200,15 @@ object ESFunction {
   def notLike[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Like, fn.function.bindings), fn.parameters)
     JObject1("not", ESFunctionCall(deNegFn).toFilter(xlateCtx, level+1, canScript))
+  }
+
+  /**
+   * Support "select * where booleanColumn (equivalent to select * where booleanColumn = true)
+   */
+  private def zeroStandaloneBooleanLevel[T](expr: TypedFF[T], level: Int): Int = {
+    expr match {
+      case col: ColumnRef[_] if (col.typ == SoQLBoolean) => 0
+      case _ => level
+    }
   }
 }

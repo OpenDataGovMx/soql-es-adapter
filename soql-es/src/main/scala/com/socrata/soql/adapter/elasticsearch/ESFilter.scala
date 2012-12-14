@@ -34,7 +34,7 @@ case class ESTypedFF[+Type](typedFF: TypedFF[Type]) extends ESFilter {
         case lit: StringLiteral[_] => ESStringLiteral(lit).toFilter(xlateCtx, level, canScript)
         case lit: NumberLiteral[_] => ESNumberLiteral(lit).toFilter(xlateCtx, level, canScript)
         case fn: FunctionCall[_] => ESFunctionCall(fn).toFilter(xlateCtx, level, canScript)
-        case lit: BooleanLiteral[_] => throw new NotImplementedException("Bool literal not supported yet.", lit.position)
+        case lit: BooleanLiteral[_] => ESBooleanLiteral(lit).toFilter(xlateCtx, level, canScript)
         case lit: NullLiteral[_] => throw new NotImplementedException("Null literal not supported yet.", lit.position)
       }
     } catch {
@@ -58,7 +58,7 @@ case class ESTypedFF[+Type](typedFF: TypedFF[Type]) extends ESFilter {
       case lit: StringLiteral[_] => ESStringLiteral(lit).toScript(xlateCtx, level)
       case lit: NumberLiteral[_] => ESNumberLiteral(lit).toScript(xlateCtx, level)
       case fn: FunctionCall[_] => ESFunctionCall(fn).toScript(xlateCtx, level)
-      case lit: BooleanLiteral[_] => throw new NotImplementedException("", lit.position)
+      case lit: BooleanLiteral[_] => ESBooleanLiteral(lit).toScript(xlateCtx, level)
       case lit: NullLiteral[_] => throw new NotImplementedException("", lit.position)
     }
   }
@@ -137,6 +137,9 @@ case class ESColumnRef[T](col: ColumnRef[T]) extends ESFilter {
     col.typ match {
       case x: SoQLNumber.type => JString(col.column.name)
       case x: SoQLText.type => JString(col.column.name)
+      case x: SoQLBoolean.type if (level == 0) =>
+        // This trick makes standalone boolean column work - select * where boolColumn
+        JObject(Map("term" -> JObject(Map(col.column.name -> JBoolean(true)))))
       case x => JString(col.column.name)
     }
   }
@@ -165,3 +168,14 @@ case class ESNumberLiteral[T](lit: NumberLiteral[T]) extends ESFilter {
     (JNumber(lit.value).toString, xlateCtx)
   }
 }
+
+case class ESBooleanLiteral[T](lit: BooleanLiteral[T]) extends ESFilter {
+  def toFilter(xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+    JBoolean(lit.value)
+  }
+
+  def toScript(xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0): Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
+    (JBoolean(lit.value).toString, xlateCtx)
+  }
+}
+

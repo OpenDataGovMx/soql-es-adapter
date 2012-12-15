@@ -13,6 +13,8 @@ import com.socrata.json.codec.elasticsearch.DatasetContextCodec
 import java.io.InputStream
 import com.socrata.soql.environment.DatasetContext
 
+class GatewayException(message: String) extends Exception(message)
+
 trait ESGateway {
   def addRow(data: Map[String, AnyRef])
 
@@ -150,7 +152,7 @@ object ESHttpGateway {
     try {
       val response: Response = rf.get()
       if (response.getStatusCode < 200 || response.getStatusCode > 299) {
-        throw new InternalException(response.getStatusText)
+        throw new GatewayException(response.getStatusText)
       }
       response
     } catch {

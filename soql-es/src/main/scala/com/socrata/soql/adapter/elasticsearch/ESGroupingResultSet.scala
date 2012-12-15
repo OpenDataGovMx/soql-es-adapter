@@ -6,21 +6,22 @@ import java.nio.charset.Charset
 import annotation.tailrec
 import com.rojoma.json.ast.{JValue, JObject}
 
-
 class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
   extends ESPlainResultSet(inputStream, charset) {
 
   import ESResultSet._
   import ESGroupingResultSet._
 
-  override def rowStream(): Stream[JObject] = {
+  /**
+   * Unlike regular query, there is no free total row count for facet.
+   */
+  override def rowStream(): Tuple2[Option[Long], Stream[JObject]] = {
     skipToField(lexer, "facets")
     if (!lexer.hasNext) throw new JsonParserEOF(lexer.head.position)
     val facetsResult = parseFacets(lexer)
     // TODO: Facets result may not be sorted in the right order yet.
-    facetsResult.values.toStream
+    (None, facetsResult.values.toStream)
   }
-
 
   @tailrec
   private def parseFacets(lexer: JsonEventIterator, acc: Map[JValue, JObject] = Map.empty): Map[JValue, JObject] = {

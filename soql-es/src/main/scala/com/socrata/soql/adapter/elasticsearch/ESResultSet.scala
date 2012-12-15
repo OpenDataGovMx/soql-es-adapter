@@ -5,6 +5,8 @@ import java.io.{InputStreamReader, InputStream}
 import java.nio.charset.Charset
 import annotation.tailrec
 import com.rojoma.json.ast.JObject
+import com.rojoma.json.codec.JsonCodec
+import com.rojoma.json.codec.JsonCodec._
 
 
 class ESJsonBadParse(event: JsonEvent, expect: JsonEvent) extends
@@ -19,7 +21,7 @@ trait ESResultSet {
 
   protected val jsonReader: JsonReader
 
-  def rowStream(): Stream[JObject]
+  def rowStream(): Tuple2[Option[Long], Stream[JObject]]
 }
 
 class ESPlainResultSet(inputStream: InputStream, charset: Charset) extends ESResultSet {
@@ -34,12 +36,14 @@ class ESPlainResultSet(inputStream: InputStream, charset: Charset) extends ESRes
 
   protected val jsonReader = new JsonReader(lexer)
 
-  def rowStream(): Stream[JObject] = {
-    skipToField(lexer, Seq("hits", "hits"))
+  def rowStream(): Tuple2[Option[Long], Stream[JObject]] = {
+    skipToField(lexer, Seq("hits", "total"))
+    val total = JsonCodec.fromJValue[Long](jsonReader.read())
+    skipToField(lexer, "hits")
     if (!lexer.hasNext) throw new JsonParserEOF(lexer.head.position)
     lexer.next() match {
       case sa: StartOfArrayEvent =>
-        resultStream(jsonReader)
+        (total, resultStream(jsonReader))
       case _ =>
         throw new ESJsonBadParse(lexer.head, StartOfArrayEvent())
     }

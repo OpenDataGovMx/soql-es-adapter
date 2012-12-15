@@ -5,11 +5,12 @@ import org.apache.commons.cli.CommandLineParser
 import org.apache.commons.cli.PosixParser
 import com.rojoma.simplearm.util._
 import com.socrata.injest.ESImport
-import com.socrata.rows.ESHttpGateway
+import com.socrata.rows.{GatewayException, ESHttpGateway}
 import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
 import com.socrata.soql.exceptions.SoQLException
 import com.socrata.soql.adapter.SoQLAdapterException
 import java.io.InputStream
+import com.socrata.exceptions.unobtainium.InternalException
 
 object Main extends App {
 
@@ -24,7 +25,7 @@ object Main extends App {
   private val cmd: org.apache.commons.cli.CommandLine = cmdParser.parse(options, args)
 
   val fileName = Option(cmd.getOptionValue("f"))
-  val resource = Option(cmd.getOptionValue("r"))
+  var resource = Option(cmd.getOptionValue("r"))
   val batchSize = Option(cmd.getOptionValue("bs")).getOrElse("1000").toInt
   val es = Option(cmd.getOptionValue("es")).getOrElse("http://localhost:9200")
 
@@ -47,25 +48,39 @@ object Main extends App {
   sys.exit()
 
   private def esSoqlPrompt() {
-    val esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
-    val esQuery = new ESQuery(resource.get, esGateway)
+    var esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
+    var esQuery = new ESQuery(resource.get, esGateway)
+
+    val switchDatasetCmd = """switch\s+(.+)""".r
 
     while(true) {
       val cmd = readLine("soql %s>".format(resource.get))
-      if(cmd == null || cmd.toLowerCase == "exit" || cmd.toLowerCase == "quit")
-        return
       try {
-        val qryConversionResult = esQuery.full(cmd)
-        println("\nElastic Search Query String:\n" + qryConversionResult._1)
-
-        using(esGateway.search(qryConversionResult._1)) { inputStream: InputStream =>
-          val rowStream = ESResultSet.parser(qryConversionResult._2.isGrouped, inputStream).rowStream()
-          println("\nResults:")
-          println(rowStream.mkString("[", ",", "]"))
+        cmd match {
+          case "" => println("%s on %s".format(resource.get, es))
+          case "exit" | "quit" | "e" | "q" => return
+          case "map" =>
+            val ctx = esGateway.getDataContext()
+            for( ((colName, soqlType), idx) <- ctx.schema.zipWithIndex) {
+              println("%d: %s: %s".format(idx + 1, colName.name, soqlType.name.name))
+            }
+          case switchDatasetCmd(name) =>
+            resource = Some(name)
+            esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
+            esQuery = new ESQuery(resource.get, esGateway)
+          case _ =>
+              val (qry, analysis) = esQuery.full(cmd)
+              println("\nElastic Search Query String:\n" + qry)
+              using(esGateway.search(qry)) { inputStream: InputStream =>
+                val (total, rowStream) = ESResultSet.parser(analysis.isGrouped, inputStream).rowStream()
+                println("\nResult total rows: %d, returned rows: %d".format(total.getOrElse(-1), rowStream.size))
+                println(rowStream.mkString("[", ",", "]"))
+              }
         }
       } catch {
         case e: SoQLException => println(e.getMessage)
         case e: SoQLAdapterException => println(e.getMessage)
+        case e: GatewayException => println(e.getMessage)
         case e: java.net.ConnectException =>
           println(e.getMessage + "\nMake sure that elasticsearch server is running.")
       }

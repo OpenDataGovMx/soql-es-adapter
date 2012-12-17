@@ -475,7 +475,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
 
 object ESQueryTest {
   val esGateway = new ESTestGateway()
-  val esQuery = new ESQuery("visitors", esGateway)
+  val esQuery = new ESQuery("visitors", esGateway, None)
 
   def toEsQuery(soql: String): Any = esQuery.full(soql)._1
 

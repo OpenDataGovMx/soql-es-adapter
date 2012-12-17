@@ -21,7 +21,7 @@ import util.parsing.input.Position
 import com.blist.rows.format.DataTypeConverter
 import com.blist.models.views.DataType
 
-class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapter[String] {
+class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Option[BigInt] = Some(1000)) extends SoqlAdapter[String] {
 
   import ESQuery._
 
@@ -61,7 +61,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
     // For group by, we don't want any individual rows to be returned.  Setting limit to 0 accomplish that.
     val esLimit =
       if (analysis.isGrouped) Some(toESLimit(0))
-      else analysis.limit.map(toESLimit)
+      else (analysis.limit ++ defaultLimit).headOption.map(toESLimit)
 
     val esObjectPropsSomeValuesMayBeEmpty =
       OrderedMap(
@@ -121,7 +121,12 @@ class ESQuery(val resource: String, val esGateway: ESGateway) extends SoqlAdapte
               // terms stat only works on numeric fields.  Use value script to at least get sensible result for count(text)
               ("value_script", JString("doc[%s].empty ? 0 : 1".format(JString(aggregateValue.column.name))))
           }
-          val size: BigInt = if (limit.isEmpty || offset.isEmpty) 0 else limit.get + offset.get
+          // Make some sense out of optional offset, limit and default limit.
+          val size: BigInt =
+            if (limit.isEmpty && offset.isEmpty) defaultLimit.getOrElse(0)
+            else if (limit.isDefined && offset.isEmpty) limit.get
+            else if (offset.isDefined && limit.isEmpty) offset.get + defaultLimit.getOrElse(1)
+            else limit.get + offset.get
           val facetKeyVal = JObject(Map(
             "key_field" -> JString(col.column.name), facetVal._1 -> facetVal._2,
             "order" -> JString("term"), // TODO - allow different orderings

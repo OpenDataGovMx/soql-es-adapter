@@ -2,8 +2,7 @@ package com.socrata.soql.adapter.elasticsearch
 
 import com.socrata.soql.typed.{ColumnRef, FunctionCall}
 import com.socrata.soql.adapter.{NotImplementedException, XlateCtx}
-import com.socrata.soql.functions.MonomorphicFunction
-import com.socrata.soql.types.SoQLFunctions
+import com.socrata.soql.functions.{SoQLFunctions, MonomorphicFunction}
 
 object ESScriptFunction {
 
@@ -29,7 +28,7 @@ object ESScriptFunction {
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
     fn.parameters match {
       case param :: Nil =>
-        val (child, childCtx) = ESTypedFF(param).toScript(xlateCtx, level+1)
+        val (child, childCtx) = ESCoreExpr(param).toScript(xlateCtx, level+1)
         ("(!%s)".format(child), childCtx)
       case _  => throw new NotImplementedException("", fn.position)
     }
@@ -37,25 +36,25 @@ object ESScriptFunction {
 
   def unaryMinus[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    val (child, childCtx) = ESTypedFF(fn.parameters.head).toScript(xlateCtx, level+1)
+    val (child, childCtx) = ESCoreExpr(fn.parameters.head).toScript(xlateCtx, level+1)
     ("-(%s)".format(child), childCtx)
   }
 
   def textToNumber[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    val (child, childCtx) = ESTypedFF(fn.parameters.head).toScript(xlateCtx, level+1)
+    val (child, childCtx) = ESCoreExpr(fn.parameters.head).toScript(xlateCtx, level+1)
     ("parseFloat(%s)".format(child), childCtx + requireJS)
   }
 
   def numberToText[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    val (child, childCtx) = ESTypedFF(fn.parameters.head).toScript(xlateCtx, level+1)
+    val (child, childCtx) = ESCoreExpr(fn.parameters.head).toScript(xlateCtx, level+1)
     ("(%s).toString()".format(child), childCtx + requireJS)
   }
 
   def between[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    val children = fn.parameters.map(ESTypedFF(_).toScript(xlateCtx, level+1))
+    val children = fn.parameters.map(ESCoreExpr(_).toScript(xlateCtx, level+1))
     val scriptedParams = children.map(x => x._1)
     val childrenCtx = children.foldLeft(xlateCtx) { (x, y) => x ++ y._2}
 
@@ -65,15 +64,15 @@ object ESScriptFunction {
   def notBetween[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
     val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Between, fn.function.bindings), fn.parameters)
-    val (child, childCtx) = ESTypedFF(deNegFn).toScript(xlateCtx, level+1)
+    val (child, childCtx) = ESCoreExpr(deNegFn).toScript(xlateCtx, level+1)
     ("(!%s)".format(child), childCtx)
   }
 
   def in[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
 
-    val (lhs, lhsCtx) = ESTypedFF(fn.parameters.head).toScript(xlateCtx, level+1)
-    val rhss = fn.parameters.tail.map(ESTypedFF(_).toScript(xlateCtx, level+1))
+    val (lhs, lhsCtx) = ESCoreExpr(fn.parameters.head).toScript(xlateCtx, level+1)
+    val rhss = fn.parameters.tail.map(ESCoreExpr(_).toScript(xlateCtx, level+1))
     val childrenCtx = rhss.foldLeft(lhsCtx) { (accCtx, rhs) => accCtx ++ rhs._2 }
     val script = rhss.map( rhs => "(%s == %s)".format(lhs, rhs._1)).mkString("(", " || ", ")")
     (script, childrenCtx)
@@ -82,13 +81,13 @@ object ESScriptFunction {
   def notIn[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
     val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)
-    val (child, childCtx) = ESTypedFF(deNegFn).toScript(xlateCtx, level+1)
+    val (child, childCtx) = ESCoreExpr(deNegFn).toScript(xlateCtx, level+1)
     ("(!%s)".format(child), childCtx)
   }
 
   def infix[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    val children = fn.parameters.map(ESTypedFF(_).toScript(xlateCtx, level+1))
+    val children = fn.parameters.map(ESCoreExpr(_).toScript(xlateCtx, level+1))
     val scriptedParams = children.map(x => x._1)
     val childrenCtx = children.foldLeft(xlateCtx) { (x, y) => x ++ y._2}
 

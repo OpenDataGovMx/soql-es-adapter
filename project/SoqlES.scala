@@ -1,4 +1,3 @@
-import com.socrata.socratasbt.SocrataSbt._
 import sbt._
 import Keys._
 
@@ -16,7 +15,7 @@ object SoqlES {
     socrataBlistMisc,
     socrataCoreMisc,
     socrataUtil,
-    soqlParser
+    soqlStdlib
   )
 }
 

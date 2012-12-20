@@ -6,13 +6,7 @@ import com.rojoma.json.ast.JString
 import com.socrata.soql.adapter.{SoQLAdapterException, NotImplementedException, XlateCtx}
 import com.socrata.soql.typed._
 import com.socrata.soql.types._
-import com.socrata.soql.typed.StringLiteral
-import com.socrata.soql.typed.BooleanLiteral
-import com.socrata.soql.typed.NullLiteral
-import com.socrata.soql.typed.NumberLiteral
-import com.socrata.soql.typed.ColumnRef
-import com.socrata.soql.typed.FunctionCall
-import com.socrata.soql.functions.MonomorphicFunction
+import com.socrata.soql.functions.{SoQLFunctions, MonomorphicFunction}
 import scala.Tuple2
 import util.parsing.input.Position
 
@@ -25,11 +19,11 @@ trait ESFilter {
 
 class RequireScriptFilter(message: String, position: Position) extends SoQLAdapterException(message, position)
 
-case class ESTypedFF[+Type](typedFF: TypedFF[Type]) extends ESFilter {
+case class ESCoreExpr[+Type](coreExpr: CoreExpr[Type]) extends ESFilter {
 
   def toFilter(xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     try {
-      typedFF match {
+      coreExpr match {
         case col: ColumnRef[_] => ESColumnRef(col).toFilter(xlateCtx, level, canScript)
         case lit: StringLiteral[_] => ESStringLiteral(lit).toFilter(xlateCtx, level, canScript)
         case lit: NumberLiteral[_] => ESNumberLiteral(lit).toFilter(xlateCtx, level, canScript)
@@ -48,12 +42,12 @@ case class ESTypedFF[+Type](typedFF: TypedFF[Type]) extends ESFilter {
           ))))
         }
         else if (level > 0) throw ex
-        else throw new NotImplementedException("Expression not implemented", typedFF.position)
+        else throw new NotImplementedException("Expression not implemented", coreExpr.position)
     }
   }
 
   def toScript(xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0): Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    typedFF match {
+    coreExpr match {
       case col: ColumnRef[_] => ESColumnRef(col).toScript(xlateCtx, level)
       case lit: StringLiteral[_] => ESStringLiteral(lit).toScript(xlateCtx, level)
       case lit: NumberLiteral[_] => ESNumberLiteral(lit).toScript(xlateCtx, level)

@@ -2,10 +2,10 @@ package com.socrata.rows
 
 import java.{lang => jl}
 
-import com.socrata.soql.DatasetContext
 import com.socrata.soql.types._
 import org.apache.commons.lang.NotImplementedException
-import com.socrata.soql.names.ColumnName
+import com.socrata.soql.environment.{ColumnName, DatasetContext}
+import com.socrata.soql.collection.OrderedMap
 
 class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) extends ESGateway {
 
@@ -42,7 +42,7 @@ object ESTestGateway {
   implicit val datasetCtx = new DatasetContext[SoQLType] {
     private implicit def ctx = this
     val locale = com.ibm.icu.util.ULocale.ENGLISH
-    val schema = com.socrata.collection.OrderedMap(
+    val schema = OrderedMap(
       ColumnName(":id") -> SoQLNumber,
       ColumnName(":updated_at") -> SoQLFixedTimestamp,
       ColumnName(":created_at") -> SoQLFixedTimestamp,

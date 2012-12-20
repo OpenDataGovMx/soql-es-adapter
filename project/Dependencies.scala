@@ -15,7 +15,7 @@ object Dependencies {
     val slf4j = "1.6.6"
     val socrataCoreMisc = "1.2.4"
     val socrataUtils = "0.5.0"
-    val soqlParser = "0.0.6"
+    val soqlStdlib = "0.0.7"
   }
 
   val asyncHttpClient = "com.ning" % "async-http-client" % versions.asyncHttpClient
@@ -46,7 +46,7 @@ object Dependencies {
 
   val socrataUtil = "com.socrata" %% "socrata-utils" % versions.socrataUtils
 
-  val soqlParser = "com.socrata" %% "soql-parser" % versions.soqlParser
+  val soqlStdlib = "com.socrata" %% "soql-stdlib" % versions.soqlStdlib
 
 
   def scalaCheck(implicit scalaVersion: String) = ScalaVersion.v match {

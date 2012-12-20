@@ -1,12 +1,11 @@
 package com.socrata.json.codec.elasticsearch
 
+import com.rojoma.json.ast._
 import com.rojoma.json.codec.JsonCodec
-import com.rojoma.json.matcher.{POption, PObject, Variable}
-import com.rojoma.json.ast.{JObject, JValue}
-import com.socrata.soql.names.{ColumnName, TypeName}
-import com.socrata.soql.{SchemalessDatasetContext, DatasetContext}
+import com.rojoma.json.matcher._
+import com.socrata.soql.collection.OrderedMap
+import com.socrata.soql.environment._
 import com.socrata.soql.types.SoQLType
-
 import org.apache.commons.lang.NotImplementedException
 
 class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[DatasetContext[SoQLType]] {
@@ -57,7 +56,7 @@ class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[Dat
         val datasetContext = new DatasetContext[SoQLType] {
           implicit val ctx = this
           val locale = com.ibm.icu.util.ULocale.ENGLISH
-          val colMap = jo.foldLeft(com.socrata.collection.OrderedMap.empty[ColumnName, SoQLType]){(ordMap, kv) =>
+          val colMap = jo.foldLeft(OrderedMap.empty[ColumnName, SoQLType]){(ordMap, kv) =>
             ordMap + (ColumnName(kv._1) -> decodeType(kv._2))
           }
           val schema = colMap

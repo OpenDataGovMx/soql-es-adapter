@@ -1,8 +1,7 @@
 package com.socrata.soql.adapter.elasticsearch
 
 import com.socrata.soql.typed._
-import com.socrata.soql.functions.MonomorphicFunction
-import com.socrata.soql.types.SoQLFunctions
+import com.socrata.soql.functions.{SoQLFunctions, MonomorphicFunction}
 import annotation.tailrec
 
 /** *
@@ -10,11 +9,11 @@ import annotation.tailrec
   * If the child expressions are compound or column to column, a different coarse of action is needed.
   * This class helps recognize such simple usage pattern.
   */
-class SimpleColumnLiteralExpression[T](val col: TypedFF[T], val lit: TypedFF[T], val lit2: Option[TypedFF[T]], val lhsIsColumn: Boolean)
+class SimpleColumnLiteralExpression[T](val col: CoreExpr[T], val lit: CoreExpr[T], val lit2: Option[CoreExpr[T]], val lhsIsColumn: Boolean)
 
 object SimpleColumnLiteralExpression {
 
-  def unapply[T](exprs: Seq[TypedFF[T]]): Option[SimpleColumnLiteralExpression[T]] = {
+  def unapply[T](exprs: Seq[CoreExpr[T]]): Option[SimpleColumnLiteralExpression[T]] = {
 
     val colsLitsCpounds = partitionExprs[T](exprs)
     if (isSimpleColumnLiteral(colsLitsCpounds)) {
@@ -29,12 +28,12 @@ object SimpleColumnLiteralExpression {
     }
   }
 
-  private def isSimpleColumnLiteral[T](exprs: Tuple3[Seq[TypedFF[T]], Seq[TypedFF[T]], Seq[TypedFF[T]]]) = {
+  private def isSimpleColumnLiteral[T](exprs: Tuple3[Seq[CoreExpr[T]], Seq[CoreExpr[T]], Seq[CoreExpr[T]]]) = {
     exprs._1.size == 1 && exprs._2.size >= 1 && exprs._3.isEmpty
   }
 
   @tailrec
-  private def considerLiteral[T](expr: TypedFF[T]): Boolean = {
+  private def considerLiteral[T](expr: CoreExpr[T]): Boolean = {
     expr match {
       case _ : TypedLiteral[_] => true
       case FunctionCall(MonomorphicFunction(SoQLFunctions.TextToFloatingTimestamp, _), arg :: Nil) =>
@@ -48,7 +47,7 @@ object SimpleColumnLiteralExpression {
   /**
    * Partition expression into 3 types - columns, literal and compounds.
    */
-  private def partitionExprs[T](exprs: Seq[TypedFF[T]]) = {
+  private def partitionExprs[T](exprs: Seq[CoreExpr[T]]) = {
 
     val (cols, nonCols) = exprs.partition(_.isInstanceOf[ColumnRef[_]])
     val (lits, cpounds) = nonCols.partition(considerLiteral(_))

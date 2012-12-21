@@ -19,7 +19,7 @@ object Main extends App {
   options.addOption("r", true, "resource_name")
   options.addOption("f", true, "full csv file name")
   options.addOption("bs", true, "batch size (default 1000)")
-  options.addOption("m", false, "add column map")
+  options.addOption("m", true, "add column map")
 
   private val cmdParser: CommandLineParser = new PosixParser()
   private val cmd: org.apache.commons.cli.CommandLine = cmdParser.parse(options, args)
@@ -28,6 +28,7 @@ object Main extends App {
   var resource = Option(cmd.getOptionValue("r"))
   val batchSize = Option(cmd.getOptionValue("bs")).getOrElse("1000").toInt
   val es = Option(cmd.getOptionValue("es")).getOrElse("http://localhost:9200")
+  val mapFile = Option(cmd.getOptionValue("m")).getOrElse(fileName.get.replace(".csv", "-type.csv").replace(".gz", ""))
 
   if (resource.isEmpty) {
     val helpMsg = options.getOptions.toArray.map { o =>
@@ -38,7 +39,7 @@ object Main extends App {
   } else {
     if (fileName.isDefined) {
       println("importing %s directly into %s".format(fileName.get, resource.get))
-      ESImport.go(resource.get, fileName.get, batchSize, cmd.hasOption("m"), es)
+      ESImport.go(resource.get, fileName.get, mapFile, batchSize, cmd.hasOption("m"), es)
       println("done importing")
     } else {
       esSoqlPrompt()

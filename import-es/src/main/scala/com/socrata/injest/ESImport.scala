@@ -1,18 +1,24 @@
 package com.socrata.injest
 
 import au.com.bytecode.opencsv.CSVReader
-import java.io.{File, FileReader}
+import java.io._
 import com.rojoma.simplearm.util._
 import com.socrata.rows.{ESColumnMap, ESHttpGateway}
 import com.socrata.util.strings.CamelCase
 import util.matching.Regex
+import java.util.zip.GZIPInputStream
 
 object ESImport {
 
-  def go(resource: String, fileName: String, batchSize: Int, addColumnMap: Boolean, es: String) {
+  def go(resource: String, fileName: String, mapFile: String, batchSize: Int, addColumnMap: Boolean, es: String) {
 
     val file = new File(fileName)
-    val fileReader = new FileReader(file)
+    var is : InputStream = new FileInputStream(file)
+    if (fileName.toLowerCase.endsWith(".gz")) {
+      is = new GZIPInputStream(is)
+    }
+    val fileReader = new InputStreamReader(is)
+
     val esGateway = new ESHttpGateway(resource, batchSize = batchSize, esBaseUrl = es)
 
     using (new CSVReader(fileReader)) { csv =>
@@ -20,7 +26,7 @@ object ESImport {
         // Essentially underscorize column name.
         "[^\\d\\w]".r.replaceAllIn(CamelCase.decamelize(CamelCase.camelize(f.toLowerCase, false)), "_") )
       val headerWithIndex = headerName.zipWithIndex.toMap
-      val esColumnMap: Array[ESColumnMap] = columnTypes(fileName, headerName)
+      val esColumnMap: Array[ESColumnMap] = columnTypes(fileName, mapFile, headerName)
 
       esGateway.ensureIndex()
       if (addColumnMap) {
@@ -47,12 +53,11 @@ object ESImport {
    * @param header - header column array used in case if there is no type file.
    * @return - array of column map.
    */
-  private def columnTypes(fileName: String, header: Array[String]): Array[ESColumnMap] = {
+  private def columnTypes(fileName: String, mapFile: String, header: Array[String]): Array[ESColumnMap] = {
 
     import com.socrata.rows.ESColumnMap._
 
-    val typeFileName = fileName.replaceAll(".csv", "-type.csv")
-    val file = new File(typeFileName)
+    val file = new File(mapFile)
     if (file.exists()) {
       val fileReader = new FileReader(file)
       using (new CSVReader(fileReader)) { csv =>

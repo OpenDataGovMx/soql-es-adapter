@@ -17,7 +17,8 @@ object ESImport {
 
     using (new CSVReader(fileReader)) { csv =>
       val headerName: Array[String] = csv.readNext().map(f =>
-        "[^\\d\\w]".r.replaceAllIn(CamelCase.decamelize(CamelCase.camelize(f)), "_") )
+        // Essentially underscorize column name.
+        "[^\\d\\w]".r.replaceAllIn(CamelCase.decamelize(CamelCase.camelize(f.toLowerCase, false)), "_") )
       val headerWithIndex = headerName.zipWithIndex.toMap
       val esColumnMap: Array[ESColumnMap] = columnTypes(fileName, headerName)
 

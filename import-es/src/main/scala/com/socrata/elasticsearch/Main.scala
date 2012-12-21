@@ -28,7 +28,10 @@ object Main extends App {
   var resource = Option(cmd.getOptionValue("r"))
   val batchSize = Option(cmd.getOptionValue("bs")).getOrElse("1000").toInt
   val es = Option(cmd.getOptionValue("es")).getOrElse("http://localhost:9200")
-  val mapFile = Option(cmd.getOptionValue("m")).getOrElse(fileName.get.replace(".csv", "-type.csv").replace(".gz", ""))
+  val mapFile = fileName match {
+    case Some(fName) => Some(Option(cmd.getOptionValue("m")).getOrElse(fName.replace(".csv", "-type.csv").replace(".gz", "")))
+    case None => None
+  }
 
   if (resource.isEmpty) {
     val helpMsg = options.getOptions.toArray.map { o =>
@@ -39,7 +42,7 @@ object Main extends App {
   } else {
     if (fileName.isDefined) {
       println("importing %s directly into %s".format(fileName.get, resource.get))
-      ESImport.go(resource.get, fileName.get, mapFile, batchSize, cmd.hasOption("m"), es)
+      ESImport.go(resource.get, fileName.get, mapFile.get, batchSize, cmd.hasOption("m"), es)
       println("done importing")
     } else {
       esSoqlPrompt()

@@ -10,16 +10,16 @@ class ESQueryTest extends FunSuite with MustMatchers {
   import ESQueryTest._
 
   test("column function literal") {
-    toEsQuery("select * where case_number in ( 'HP109135', 'HP110029', 'HP110438')") must equal(json(
+    toEsQuery("select * where case_number in ( 'HP109135', 'HP110029', 'HP10438')") must equal(json(
       """
         {
           "filter" :
-            { "terms" : { "case_number" : [ "HP109135", "HP110029", "HP110438" ] } }
+            { "terms" : { "case_number" : [ "hp109135", "hp110029", "hp10438" ] } }
         }
       """))
 
     toEsQuery("select * where primary_type = 'BURGLARY' limit 5") must equal(json(
-      """{ "filter" : { "term" : { "primary_type" : "BURGLARY" } }, "size" : 5 }""".stripMargin))
+      """{ "filter" : { "term" : { "primary_type" : "burglary" } }, "size" : 5 }""".stripMargin))
 
     toEsQuery("select * where primary_type < 'BURGLARY' limit 5") must equal(json(
       """
@@ -27,7 +27,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
           "filter" :
             {
               "range" :
-                { "primary_type" : { "to" : "BURGLARY", "include_upper" : false } }
+                { "primary_type" : { "to" : "burglary", "include_upper" : false } }
             },
           "size" : 5
         }
@@ -41,8 +41,8 @@ class ESQueryTest extends FunSuite with MustMatchers {
                 {
                   "primary_type" :
                     {
-                      "from" : "B",
-                      "to" : "CZ",
+                      "from" : "b",
+                      "to" : "cz",
                       "include_upper" : true,
                       "include_lower" : true
                     }
@@ -120,14 +120,14 @@ class ESQueryTest extends FunSuite with MustMatchers {
                     "and" :
                       [
                         { "term" : { "year" : 2005 } },
-                        { "term" : { "primary_type" : "THEFT" } }
+                        { "term" : { "primary_type" : "theft" } }
                       ]
                   },
                   {
                     "and" :
                       [
                         { "term" : { "year" : 2006 } },
-                        { "term" : { "primary_type" : "BATTERY" } }
+                        { "term" : { "primary_type" : "battery" } }
                       ]
                   }
                 ]
@@ -142,7 +142,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
               "and" :
                 [
                   { "term" : { "year" : 2008 } },
-                  { "term" : { "primary_type" : "BULGARY" } }
+                  { "term" : { "primary_type" : "bulgary" } }
                 ]
             },
           "sort" : [ { "case_number" : "asc" } ]
@@ -223,8 +223,8 @@ class ESQueryTest extends FunSuite with MustMatchers {
                 {
                   "or" :
                     [
-                      { "term" : { "case_number" : "HP109135" } },
-                      { "term" : { "case_number" : "HP110029" } }
+                      { "term" : { "case_number" : "hp109135" } },
+                      { "term" : { "case_number" : "hp110029" } }
                     ]
                 }
             }
@@ -233,12 +233,12 @@ class ESQueryTest extends FunSuite with MustMatchers {
 
     toEsQuery("select * where case_number like 'HP%'") must equal (json(
       """
-        { "filter" : { "prefix" : { "case_number" : "HP" } } }
+        { "filter" : { "prefix" : { "case_number" : "hp" } } }
       """))
 
     toEsQuery("select * where case_number like 'HP%123%'") must equal (json(
       """
-        { "filter" : { "query" : { "wildcard" : { "case_number" : "HP*123*" } } } }
+        { "filter" : { "query" : { "wildcard" : { "case_number" : "hp*123*" } } } }
       """))
 
     toEsQuery("select * where updated_on is null") must equal(json(
@@ -337,7 +337,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
               "script" :
                 {
                   "lang" : "mvel",
-                  "script" : "((doc['case_number'].value == \"HP109135\") || (doc['case_number'].value == (\"HP\" + \"110029\")))"
+                  "script" : "((doc['case_number'].value == \"hp109135\") || (doc['case_number'].value == (\"hp\" + \"110029\")))"
                 }
             }
         }
@@ -348,7 +348,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
           "filter" :
             {
               "script" :
-                { "lang" : "mvel", "script" : "((\"HP109135\" == \"HP109135\"))" }
+                { "lang" : "mvel", "script" : "((\"hp109135\" == \"hp109135\"))" }
             },
           "size" : 2
         }
@@ -393,7 +393,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
             {
               "or" :
                 [
-                  { "term" : { "case_number" : "HP109135" } },
+                  { "term" : { "case_number" : "hp109135" } },
                   {
                     "script" :
                       {
@@ -450,7 +450,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
             {
               "or" :
                 [
-                  { "term" : { "case_number" : "HP109135" } },
+                  { "term" : { "case_number" : "hp109135" } },
                   { "term" : { "arrest" : true } }
                 ]
             }
@@ -465,7 +465,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
               "and" :
                 [
                   { "not" : { "term" : { "arrest" : true } } },
-                  { "term" : { "case_number" : "HP109135" } }
+                  { "term" : { "case_number" : "hp109135" } }
                 ]
             }
         }

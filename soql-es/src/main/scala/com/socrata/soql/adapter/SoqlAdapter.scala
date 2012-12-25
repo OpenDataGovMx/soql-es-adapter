@@ -31,4 +31,5 @@ trait SoqlAdapter[T] {
 object XlateCtx extends Enumeration {
   type XlateCtx = Value
   val ESLang = Value("es-lang")
+  val LowercaseStringLiteral = Value("lower-str-lit")
 }

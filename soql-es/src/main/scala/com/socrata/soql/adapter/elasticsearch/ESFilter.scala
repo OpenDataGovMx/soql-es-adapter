@@ -145,11 +145,12 @@ case class ESColumnRef[T](col: ColumnRef[T]) extends ESFilter {
 
 case class ESStringLiteral[T](lit: StringLiteral[T]) extends ESFilter {
   def toFilter(xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
-    JString(lit.value)
+    val v = lit.value
+    JString(if (xlateCtx.contains(XlateCtx.LowercaseStringLiteral)) v.toLowerCase else v)
   }
 
   def toScript(xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0): Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    (JString(lit.value).toString, xlateCtx)
+    (toFilter(xlateCtx, level).toString(), xlateCtx)
   }
 }
 

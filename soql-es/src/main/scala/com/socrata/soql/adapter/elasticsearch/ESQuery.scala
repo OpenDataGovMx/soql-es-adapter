@@ -43,7 +43,8 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     implicit val ctx: DatasetContext[SoQLType] = datasetCtx
 
     val analysis = analyzer.analyzeFullQuery(soql)
-    val esFilter = analysis.where.map(toESFilter(_, Map.empty[XlateCtx.Value, AnyRef], canScript = true))
+    val xlateCtx: Map[XlateCtx.Value, AnyRef] = Map(XlateCtx.LowercaseStringLiteral -> Boolean.box(true))
+    val esFilter = analysis.where.map(toESFilter(_, xlateCtx, canScript = true))
     val esFilterOrQuery = esFilter.map { filter =>
     // A top filter apply independently of facets
     // Must wrap in a query in order to affect facets.

@@ -42,8 +42,17 @@ object ESColumnMap {
 
     override def propMap: JValue = JObject(Map(
       "type" -> JString("string"),
-      "index" -> JString("not_analyzed"),
+      "index" -> JString("analyzed"),
       "store" -> JString("yes"),
+      // in ELASTICSEARCH.YML.  There should be a custom analyzer defined:
+      // index:
+      //   analysis:
+      //     analyzer:
+      //       one_lower_token:
+      //         type: custom
+      //         tokenizer: keyword
+      //         filter: [lowercase]
+      "analyzer" -> JString("one_lower_token"),
       "omit_norms" -> JBoolean(true)
     ))
   }

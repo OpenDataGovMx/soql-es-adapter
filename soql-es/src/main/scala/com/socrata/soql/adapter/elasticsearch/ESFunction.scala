@@ -187,10 +187,13 @@ object ESFunction {
         ESCoreExpr(col).toFilter(xlateCtx, level+1) match {
           case JString(col) =>
             val startsWithRx = """([^\%]+)[\%]""".r
-            lit.value match {
-              case startsWithRx(s) => JObject1("prefix", JObject1(col, JString(s)))
-              case wildCard => JObject1("query", JObject1("wildcard", JObject1(col,
-                JString(lit.value.replace("*", "").replace("%", "*")))))
+            val JString(litVal) = ESCoreExpr(lit).toFilter(xlateCtx, level)
+            litVal match {
+              case startsWithRx(s) =>
+                JObject1("prefix", JObject1(col, JString(s)))
+              case wildCard =>
+                JObject1("query", JObject1("wildcard", JObject1(col,
+                JString(litVal.replace("*", "").replace("%", "*")))))
             }
           case _ => throw new Exception("should never get here, %s".format(fn.function.name))
         }

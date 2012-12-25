@@ -52,10 +52,13 @@ object Main extends App {
   sys.exit()
 
   private def esSoqlPrompt() {
+    var limit: Option[BigInt] = None
     var esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
-    var esQuery = new ESQuery(resource.get, esGateway)
+    var esQuery = new ESQuery(resource.get, esGateway, limit)
+
 
     val switchDatasetCmd = """switch\s+(.+)""".r
+    val limitCmd = """limit\s+(.+)""".r
 
     while(true) {
       val cmd = readLine("soql %s>".format(resource.get))
@@ -71,7 +74,10 @@ object Main extends App {
           case switchDatasetCmd(name) =>
             resource = Some(name)
             esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
-            esQuery = new ESQuery(resource.get, esGateway)
+            esQuery = new ESQuery(resource.get, esGateway, limit)
+          case limitCmd(lim) =>
+            limit = Some(BigInt(lim))
+            esQuery = new ESQuery(resource.get, esGateway, limit)
           case _ =>
               val (qry, analysis) = esQuery.full(cmd)
               println("\nElastic Search Query String:\n" + qry)

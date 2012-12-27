@@ -63,6 +63,19 @@ object ESColumnMap {
       "store" -> JString("yes"),
       "omit_norms" -> JBoolean(true)
     ))
+
+    override def toES(data: AnyRef): AnyRef =
+      try {
+        data match {
+          case x: String =>
+            java.lang.Double.parseDouble(x)
+          case _ =>
+        }
+        super.toES(data)
+      } catch {
+        case e: NumberFormatException =>
+          JNull
+      }
   }
 
   class ESBooleanColumnMap extends ESColumnMap {

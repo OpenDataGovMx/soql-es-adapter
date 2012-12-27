@@ -5,8 +5,8 @@ import java.io._
 import com.rojoma.simplearm.util._
 import com.socrata.rows.{ESColumnMap, ESHttpGateway}
 import com.socrata.util.strings.CamelCase
-import util.matching.Regex
 import java.util.zip.GZIPInputStream
+import com.rojoma.json.ast.JNull
 
 object ESImport {
 
@@ -39,7 +39,9 @@ object ESImport {
           case (fieldName, position) if !rawData(position).isEmpty =>
             (fieldName -> esColumnMap(position).toES(rawData(position)))
         }
-        esGateway.addRow(nonEmptyData)
+        // get rid of nulls
+        val data = nonEmptyData.filter{ case (k, v) => v != JNull }
+        esGateway.addRow(data)
         rawData = csv.readNext()
       }
       esGateway.flush()

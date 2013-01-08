@@ -3,6 +3,8 @@ package com.socrata.soql.adapter.elasticsearch
 class FacetName(val groupKey: String, val groupValue: String) {
 
   override def toString() = "fc:%s:%s".format(groupKey, groupValue)
+
+  def isMultiColumn() = groupKey == "_multi"
 }
 
 object FacetName {

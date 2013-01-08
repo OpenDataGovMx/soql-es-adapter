@@ -47,10 +47,10 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
       case o: StartOfObjectEvent =>
         parseOneFacet(lexer)
       case FieldEvent(FacetName(facet)) =>
-        skipToField(lexer, "terms")
+        skipToField(lexer, facetDataKey(facet)) // dataKey is different depending on the type of facet which can be inferred by facet name
         lexer.next() match {
           case sa: StartOfArrayEvent =>
-            val groupRow = facetToGroupRow(jsonReader, facet.groupKey, facet.groupValue)
+            val groupRow = facetToGroupRow(jsonReader, facet, facet.groupKey, facet.groupValue)
             lexer.next() // consume }
             groupRow
           case unexpected =>
@@ -62,7 +62,7 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
   }
 
   @tailrec
-  private def facetToGroupRow(reader: JsonReader, groupCol: String, aggregateCol: String, acc: Map[JValue, JObject] = Map.empty): Map[JValue, JObject] = {
+  private def facetToGroupRow(reader: JsonReader, facetName: FacetName, groupCol: String, aggregateCol: String, acc: Map[JValue, JObject] = Map.empty): Map[JValue, JObject] = {
 
     reader.lexer.head match {
       case _: EndOfArrayEvent =>
@@ -71,14 +71,14 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
       case _ =>
         reader.read() match {
           case facet@JObject(fields) =>
-            val groupKey = facet("term")
+            val groupKey = facet(facetGroupKey(facetName)) // group key is
             // term property is removed and re-added using group col.
             // for the rest of the properties, we append aggregate col to the key.
             val groupRow = (fields -- unwantedFields).map {
               case (k, v) => (aggregateFnMap(k) + "_" + aggregateCol, v)
             } + (groupCol -> groupKey)
             val acc2 = acc + (groupKey -> JObject(groupRow))
-            facetToGroupRow(reader, groupCol, aggregateCol, acc2)
+            facetToGroupRow(reader, facetName, groupCol, aggregateCol, acc2)
           case _ =>
             throw new ESJsonBadParse(reader.lexer.head, StartOfObjectEvent())
         }
@@ -89,7 +89,7 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
 object ESGroupingResultSet {
 
   // Field either we do not want or field is not a constant translation that require remove and re-add
-  val unwantedFields = Seq("term", "total_count")
+  val unwantedFields = Seq("term", "total_count", "keys")
 
   val aggregateFnMap = Map(
     "total" -> "sum",
@@ -98,4 +98,10 @@ object ESGroupingResultSet {
     "max" -> "max",
     "count" -> "count"
   )
+
+  private def facetDataKey(facetName: FacetName) =
+    if (facetName.isMultiColumn) "entries" else "terms"
+
+  private def facetGroupKey(facetName: FacetName) =
+    if (facetName.isMultiColumn) "keys" else "term"
 }

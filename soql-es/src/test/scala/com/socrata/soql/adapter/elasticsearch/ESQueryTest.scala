@@ -471,6 +471,50 @@ class ESQueryTest extends FunSuite with MustMatchers {
         }
       """.stripMargin))
   }
+
+  // TODO: honor size in columns facet
+  test("multi columns grouping") {
+
+    toEsQuery("select primary_type, arrest, count(id), min(id) group by primary_type, arrest order by primary_type, arrest") must equal(json(
+      """
+        {
+          "facets" :
+            {
+              "fc:_multi:id" :
+                {
+                  "columns" :
+                    {
+                      "key_fields" : [ "primary_type", "arrest" ],
+                      "value_field" : "id",
+                      "size" : 0,
+                      "orders" : [ "primary_type", "arrest" ]
+                    }
+                }
+            },
+          "size" : 0
+        }
+      """))
+
+    toEsQuery("select primary_type, arrest, count(id) group by primary_type, arrest order by count(id) desc, primary_type") must equal(json(
+      """
+        {
+          "facets" :
+            {
+              "fc:_multi:id" :
+                {
+                  "columns" :
+                    {
+                      "key_fields" : [ "primary_type", "arrest" ],
+                      "value_field" : "id",
+                      "size" : 0,
+                      "orders" : [ ":count desc", "primary_type" ]
+                    }
+                }
+            },
+          "size" : 0
+        }
+      """))
+  }
 }
 
 object ESQueryTest {

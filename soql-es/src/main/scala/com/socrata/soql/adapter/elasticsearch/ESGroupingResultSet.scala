@@ -5,6 +5,7 @@ import java.io.InputStream
 import java.nio.charset.Charset
 import annotation.tailrec
 import com.rojoma.json.ast.{JValue, JObject}
+import com.socrata.soql.collection.OrderedMap
 
 class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
   extends ESPlainResultSet(inputStream, charset) {
@@ -24,7 +25,7 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
   }
 
   @tailrec
-  private def parseFacets(lexer: JsonEventIterator, acc: Map[JValue, JObject] = Map.empty): Map[JValue, JObject] = {
+  private def parseFacets(lexer: JsonEventIterator, acc: OrderedMap[JValue, JObject] = OrderedMap.empty): OrderedMap[JValue, JObject] = {
 
     lexer.head match {
       case o: EndOfObjectEvent =>
@@ -41,7 +42,7 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
     }
   }
 
-  private def parseOneFacet(lexer: JsonEventIterator): Map[JValue, JObject] = {
+  private def parseOneFacet(lexer: JsonEventIterator): OrderedMap[JValue, JObject] = {
 
     lexer.next() match {
       case o: StartOfObjectEvent =>
@@ -62,7 +63,7 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
   }
 
   @tailrec
-  private def facetToGroupRow(reader: JsonReader, facetName: FacetName, groupCol: String, aggregateCol: String, acc: Map[JValue, JObject] = Map.empty): Map[JValue, JObject] = {
+  private def facetToGroupRow(reader: JsonReader, facetName: FacetName, groupCol: String, aggregateCol: String, acc: OrderedMap[JValue, JObject] = OrderedMap.empty): OrderedMap[JValue, JObject] = {
 
     reader.lexer.head match {
       case _: EndOfArrayEvent =>

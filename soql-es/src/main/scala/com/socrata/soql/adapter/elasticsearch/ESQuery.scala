@@ -189,17 +189,11 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
             }
         }
 
-        // Make some sense out of optional offset, limit and default limit.
-        val size: BigInt =
-          if (limit.isEmpty && offset.isEmpty) defaultLimit.getOrElse(0)
-          else if (limit.isDefined && offset.isEmpty) limit.get
-          else if (offset.isDefined && limit.isEmpty) offset.get + defaultLimit.getOrElse(1)
-          else limit.get + offset.get
-
-        val facetMap = Map(
+        val facetMap = OrderedMap( // ES columns facet needs orders to be specified after keys.  Therefore, we use ordered map.
           "key_fields" -> keys,
           facetVal._1 -> facetVal._2,
-          "size" -> JNumber(size)
+          "size" -> JNumber(limit.getOrElse(defaultLimit.getOrElse(BigInt(10)))),
+          "from" -> JNumber(offset.getOrElse(BigInt(0)))
         )
         val facetWithSortMap = orders match {
           case Some(obs) => facetMap + ("orders" -> JArray(obs))

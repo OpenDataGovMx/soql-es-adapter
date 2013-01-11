@@ -486,7 +486,8 @@ class ESQueryTest extends FunSuite with MustMatchers {
                     {
                       "key_fields" : [ "primary_type", "arrest" ],
                       "value_field" : "id",
-                      "size" : 0,
+                      "size" : 10,
+                      "from" : 0,
                       "orders" : [ "primary_type", "arrest" ]
                     }
                 }
@@ -506,7 +507,8 @@ class ESQueryTest extends FunSuite with MustMatchers {
                     {
                       "key_fields" : [ "primary_type", "arrest" ],
                       "value_field" : "id",
-                      "size" : 0,
+                      "size" : 10,
+                      "from" : 0,
                       "orders" : [ ":count desc", "primary_type" ]
                     }
                 }

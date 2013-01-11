@@ -141,7 +141,11 @@ class ESHttpGateway(val esIndex: String, val esType: String = "data",
 object ESHttpGateway {
 
   private val ClientConfig = new AsyncHttpClientConfig.Builder()
-    .setConnectionTimeoutInMs(60000 * 3).build() // timeout in 3 minutes
+    .setRequestTimeoutInMs(60000 * 60) // request timeout in 1 hour
+    .setConnectionTimeoutInMs(60000 * 3).build() // connection timeout in 3 minutes
+
+  println("timeout config: request - %d, connection -%d".format(
+    ClientConfig.getRequestTimeoutInMs, ClientConfig.getConnectionTimeoutInMs))
 
   private val Client = new AsyncHttpClient(ClientConfig)
 

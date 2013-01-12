@@ -6,6 +6,7 @@ import java.nio.charset.Charset
 import annotation.tailrec
 import com.rojoma.json.ast.{JValue, JObject}
 import com.socrata.soql.collection.OrderedMap
+import com.rojoma.json.codec.JsonCodec
 
 class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
   extends ESPlainResultSet(inputStream, charset) {
@@ -19,46 +20,71 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
   override def rowStream(): Tuple2[Option[Long], Stream[JObject]] = {
     skipToField(lexer, "facets")
     if (!lexer.hasNext) throw new JsonParserEOF(lexer.head.position)
-    val facetsResult = parseFacets(lexer)
+    val (total, facetsResult) = parseFacets(lexer)
     // TODO: Facets result may not be sorted in the right order yet.
-    (None, facetsResult.values.toStream)
+    (total, facetsResult.values.toStream)
   }
 
   @tailrec
-  private def parseFacets(lexer: JsonEventIterator, acc: OrderedMap[JValue, JObject] = OrderedMap.empty): OrderedMap[JValue, JObject] = {
+  private def parseFacets(lexer: JsonEventIterator, total: Option[Long] = None, acc: OrderedMap[JValue, JObject] = OrderedMap.empty):
+    Tuple2[Option[Long], OrderedMap[JValue, JObject]] = {
 
     lexer.head match {
       case o: EndOfObjectEvent =>
         lexer.next() // consume }
-        acc
+        (total, acc)
       case _ =>
-        val groupRow = parseOneFacet(lexer)
+        val (total, groupRow) = parseOneFacet(lexer)
         val combinedRow = groupRow.map {
           case (k, v) =>
             val combinedResult = JObject(v.toMap ++ acc.get(k).getOrElse(JObject(Map.empty)).toMap)
             (k -> combinedResult)
         }
-        parseFacets(lexer, combinedRow)
+        parseFacets(lexer, total, combinedRow)
     }
   }
 
-  private def parseOneFacet(lexer: JsonEventIterator): OrderedMap[JValue, JObject] = {
+  private def parseOneFacet(lexer: JsonEventIterator): Tuple2[Option[Long], OrderedMap[JValue, JObject]] = {
 
     lexer.next() match {
       case o: StartOfObjectEvent =>
         parseOneFacet(lexer)
       case FieldEvent(FacetName(facet)) =>
-        skipToField(lexer, facetDataKey(facet)) // dataKey is different depending on the type of facet which can be inferred by facet name
+        // dataKey is different depending on the type of facet which can be inferred by facet name
+        val facetType = facetDataKey(facet)
+        parseTotalOptionFacetEntries(lexer, facet, facetType, None)
+      case unexpected =>
+        throw new ESJsonBadParse(lexer.head, FieldEvent("some_facet_name"))
+    }
+  }
+
+  /**
+   * @param facetType can be columns for multi-columns and terms-stats for single column
+   * @return true if we found facet, false means we find facet content
+   */
+  @tailrec
+  private def parseTotalOptionFacetEntries(lexer: JsonEventIterator, facet: FacetName, facetType: String, total: Option[Long]):
+    Tuple2[Option[Long], OrderedMap[JValue, JObject]] = {
+
+    // total is only available in columns facet, non-exist in terms-stats facet.
+    skipToField(lexer, Set("total", facetType)) match {
+      case Some("total") =>
+        val ttl = JsonCodec.fromJValue[Long](jsonReader.read())
+        parseTotalOptionFacetEntries(lexer, facet, facetType, ttl) // keep going
+      case Some(field) if field == facetType =>
         lexer.next() match {
           case sa: StartOfArrayEvent =>
             val groupRow = facetToGroupRow(jsonReader, facet, facet.groupKey, facet.groupValue)
             lexer.next() // consume }
-            groupRow
+            (total, groupRow)
           case unexpected =>
             throw new ESJsonBadParse(lexer.head, StartOfArrayEvent())
         }
-      case unexpected =>
-        throw new ESJsonBadParse(lexer.head, FieldEvent("some_facet_name"))
+      case Some(_) => // ignore any fields other than "total" and facetType
+        lexer.dropNextDatum()
+        parseTotalOptionFacetEntries(lexer, facet, facetType, total)
+      case None =>
+        throw new ESJsonBadParse(lexer.head, StartOfArrayEvent())
     }
   }
 

@@ -94,4 +94,24 @@ object ESResultSet {
         true
     }
   }
+
+  /**
+   * Skip to any fields given in fields set
+   * @param fields fields we are looking for
+   * @return first field that match any one in fields
+   */
+  @tailrec
+  def skipToField(lexer: JsonEventIterator, fields: Set[String]): Option[String] = {
+    if (!lexer.hasNext) None
+    else lexer.next() match {
+      case FieldEvent(s) if (fields.contains(s)) =>
+        Some(s)
+      case o: StartOfObjectEvent =>
+        skipToField(lexer, fields)
+      case _ =>
+        lexer.dropNextDatum()
+        skipToField(lexer, fields)
+    }
+  }
+
 }

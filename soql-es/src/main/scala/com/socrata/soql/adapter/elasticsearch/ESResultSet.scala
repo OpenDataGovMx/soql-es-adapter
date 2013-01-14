@@ -66,7 +66,7 @@ class ESPlainResultSet(inputStream: InputStream, charset: Charset) extends ESRes
 
 object ESResultSet {
 
-  def parser(isGrouped: Boolean, inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8): ESResultSet =
+  def parser(isGrouped: Boolean, inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8.charSet): ESResultSet =
     if (isGrouped) new ESGroupingResultSet(inputStream, charset)
     else new ESPlainResultSet(inputStream, charset)
 

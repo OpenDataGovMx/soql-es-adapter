@@ -7,15 +7,14 @@ object Dependencies {
     val jodaConvert = "1.2"
     val jodaTime = "2.1"
     val opencsv = "2.1"
-    val rojomaJson = "2.0.0"
+    val rojomaJson = "2.2.0"
     val scalaCheck_28 = "1.8"
     val scalaCheck_29 = "1.10.0"
     val scalaTest = "1.8"
     val simpleArm = "1.1.10"
     val slf4j = "1.6.6"
-    val socrataCoreMisc = "1.2.4"
-    val socrataUtils = "0.5.0"
-    val soqlStdlib = "0.0.7"
+    val socrataUtils = "0.6.0"
+    val soqlStdlib = "0.0.8"
   }
 
   val asyncHttpClient = "com.ning" % "async-http-client" % versions.asyncHttpClient
@@ -38,19 +37,7 @@ object Dependencies {
 
   val slf4jSimple = "org.slf4j" % "slf4j-simple" % versions.slf4j
 
-  val socrataBlistDatatypes = "com.socrata" %% "blist-datatypes" % versions.socrataCoreMisc
-
-  val socrataBlistMisc = "com.socrata" %% "blist-misc" % versions.socrataCoreMisc
-
-  val socrataCoreMisc = "com.socrata" %% "core-misc" % versions.socrataCoreMisc
-
   val socrataUtil = "com.socrata" %% "socrata-utils" % versions.socrataUtils
 
   val soqlStdlib = "com.socrata" %% "soql-stdlib" % versions.soqlStdlib
-
-
-  def scalaCheck(implicit scalaVersion: String) = ScalaVersion.v match {
-    case Scala28 => "org.scalacheck" % "scalacheck_2.8.1" % versions.scalaCheck_28
-    case Scala29 => "org.scalacheck" %% "scalacheck" % versions.scalaCheck_29
-  }
 }

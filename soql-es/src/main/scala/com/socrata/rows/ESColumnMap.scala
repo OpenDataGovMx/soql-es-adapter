@@ -1,13 +1,11 @@
 package com.socrata.rows
 
 import java.{lang => jl}
-import org.joda.time.format.ISODateTimeFormat
+import org.joda.time.format.{DateTimeFormat, ISODateTimeFormat}
 import org.joda.time.DateTimeZone
 import com.rojoma.json.ast._
-import com.socrata.util.deepcast.DeepCast
-import com.blist.models.views.DataType
-import com.blist.util.values.LocationValue
-import com.blist.rows.format.DataTypeConverter
+import com.socrata.soql.types._
+import com.socrata.soql.environment.TypeName
 
 trait ESColumnMap {
   def toES(data: AnyRef): AnyRef
@@ -17,15 +15,24 @@ trait ESColumnMap {
 
 object ESColumnMap {
 
-  implicit def StringToDataType(dataTypeDbName: String) = DataType.Type.fromDbName(dataTypeDbName)
+  implicit def StringToDataType(dataTypeDbName: String): SoQLType = {
+    val dtName = dataTypeDbName.toLowerCase match {
+      case "calendar_date" => "floating_timestamp" // convert legacy name
+      case "checkbox" => "boolean"  // convert legacy name
+      case x => x
+    }
+    SoQLType.typesByName(TypeName(dtName))
+  }
 
-  def apply(dt: DataType.Type): ESColumnMap = {
+  def apply(dt: SoQLType): ESColumnMap = {
+
     dt match {
-      case DataType.Type.CALENDAR_DATE => esCalendarDateColumnMap
-      case DataType.Type.DATE => esDateColumnMap
-      case DataType.Type.LOCATION => esLocationColumnMap
-      case DataType.Type.NUMBER => esNumberLikeColumnMap
-      case DataType.Type.CHECKBOX => esBooleanColumnMap
+      case SoQLFixedTimestamp => esDateColumnMap
+      case SoQLFloatingTimestamp => esCalendarDateColumnMap
+      case SoQLLocation => esLocationColumnMap
+      case SoQLNumber => esNumberLikeColumnMap
+      case SoQLBoolean => esBooleanColumnMap
+      case SoQLText => esTextLikeColumnMap
       case _ => esTextLikeColumnMap
     }
   }
@@ -86,10 +93,19 @@ object ESColumnMap {
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: AnyRef) = JBoolean(DataTypeConverter.cast(data, DataType.Type.CHECKBOX).asInstanceOf[jl.Boolean].booleanValue())
+    def toES(data: AnyRef) = Option(data) match {
+      case Some(str: String) => JBoolean(jl.Boolean.parseBoolean(str))
+      case _ => JNull
+    }
   }
 
   class ESCalendarDateColumnMap extends ESColumnMap {
+
+    val tsParser = DateTimeFormat.forPattern("MM/dd/yyyy hh:mm aa").withZoneUTC
+    val tsFormat = ISODateTimeFormat.dateTimeNoMillis
+    val Iso8601 = """(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?)""".r
+    val Mmddyyyy = """(\d{2}/\d{2}/\d{4} \d{2}:\d{2} [A|P]M)""".r
+
     override def propMap: JValue = JObject(Map(
       "type" -> JString("date"),
       "format" -> JString("dateOptionalTime"),
@@ -97,45 +113,63 @@ object ESColumnMap {
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: AnyRef) = JString(DataTypeConverter.cast(data, DataType.Type.CALENDAR_DATE).asInstanceOf[String])
+    def toES(data: AnyRef) = {
+      data match {
+        case Iso8601(s,r) =>
+          val localDateTime = ISODateTimeFormat.dateTimeParser.parseLocalDateTime(s)
+          JString(tsFormat.print(localDateTime))
+        case Mmddyyyy(s) =>
+          val localDateTime = tsParser.parseLocalDateTime(s)
+          JString(tsFormat.print(localDateTime))
+        case _ => JNull
+
+      }
+    }
   }
 
   class ESDateColumnMap extends ESColumnMap {
+
+    val tsParser = DateTimeFormat.forPattern("MM/dd/yyyy hh:mm aaZ")
+    val tsFormat = ISODateTimeFormat.dateTimeNoMillis.withZone(DateTimeZone.UTC)
+
     override def propMap: JValue = JObject(Map(
       "type" -> JString("date"), "format" -> JString("dateOptionalTime"),
       "store" -> JString("no"),
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: AnyRef): AnyRef = {
-      val ts = (DataTypeConverter.cast(data, DataType.Type.DATE).asInstanceOf[java.sql.Timestamp]).getTime
-      JString(ISODateTimeFormat.dateTime().withZone(DateTimeZone.UTC).print(ts))
+    def toES(data: AnyRef) = {
+      Option(data) match {
+        case Some(s: String) =>
+          val dateTime = tsParser.parseDateTime(data.toString)
+          JString(tsFormat.print(dateTime))
+        case _ => JNull
+
+      }
     }
   }
 
   class ESLocationColumnMap extends ESColumnMap {
+
+    val fmt = """^\(([0-9.-]+), ([0-9.-]+)\)$""".r
+
     override def propMap: JValue = JObject(Map(
       "type" -> JString("geo_point"),
       "store" -> JString("yes"),
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: AnyRef): AnyRef = {
-      val loc = data match {
-        case x: LocationValue => x
-        case x: String =>
-          val locMap = DeepCast.mapOfObject.cast(DataTypeConverter.cast(x, DataType.Type.LOCATION))
-          new LocationValue(locMap)
+    def toES(data: AnyRef) = {
+      data match {
+        case fmt(lat, lon) =>
+          JString(s"$lat,$lon")
+        case _ =>
+          JNull
       }
-      JString("%s,%s".format(loc.getLatitude.toString, loc.getLongitude.toString))
     }
 
     override def fromES(data: AnyRef): AnyRef = {
-      val latLon = data.toString.split(",")
-      val loc = new LocationValue()
-      loc.setLatitude(new java.math.BigDecimal(latLon(0)))
-      loc.setLongitude(new java.math.BigDecimal(latLon(1)))
-      loc
+      data
     }
   }
 }

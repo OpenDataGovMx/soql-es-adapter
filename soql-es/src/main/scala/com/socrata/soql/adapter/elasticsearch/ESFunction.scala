@@ -2,10 +2,8 @@ package com.socrata.soql.adapter.elasticsearch
 
 import com.socrata.soql.adapter.{NotImplementedException, XlateCtx}
 import com.rojoma.json.ast._
-import com.blist.rows.format.DataTypeConverter
-import com.blist.models.views.DataType
 import com.socrata.soql.functions.SoQLFunctions
-import com.socrata.soql.types.{SoQLBoolean, SoQLType}
+import com.socrata.soql.types.{SoQLFloatingTimestamp, SoQLBoolean, SoQLType}
 import com.socrata.soql.typed._
 import com.socrata.soql.typed.StringLiteral
 import com.rojoma.json.ast.JObject
@@ -15,21 +13,54 @@ import com.socrata.soql.typed.ColumnRef
 import com.socrata.soql.typed.FunctionCall
 import com.rojoma.json.ast.JString
 import com.socrata.soql.functions.MonomorphicFunction
+import com.socrata.rows.ESColumnMap
+import com.socrata.soql.environment.FunctionName
 
 object ESFunction {
 
   import ESQuery.JObject1
+  import SoQLFunctions._
 
-  def textToFloatingTimestamp[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  def apply(functionName: FunctionName) = funMap.get(functionName)
+
+  private val funMap = Map(
+    IsNull.name -> isNull _,
+    IsNotNull.name -> isNotNull _,
+    Not.name -> not _,
+    In.name -> in _,
+    NotIn.name -> notIn _,
+    Eq.name -> equ _,
+    EqEq.name -> equ _,
+    TextToFloatingTimestamp.name -> textToFloatingTimestamp _,
+    Neq.name -> neq _,
+    BangEq.name -> neq _,
+    And.name -> andOr _,
+    Or.name -> andOr _,
+    UnaryMinus.name -> unaryMinus _,
+    NotBetween.name -> notBetween _,
+    WithinCircle.name -> withinCircle _,
+    WithinBox.name -> withinBox _,
+    Between.name -> between _,
+    Lt.name -> lgte _,
+    Lte.name -> lgte _,
+    Gt.name -> lgte _,
+    Gte.name -> lgte _,
+    Like.name -> like _,
+    NotLike.name -> notLike _)
+
+  private def textToFloatingTimestamp(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case (param: StringLiteral[_]) :: Nil =>
-        val dateLit = StringLiteral(DataTypeConverter.cast(param.value, DataType.Type.CALENDAR_DATE).asInstanceOf[String], SoQLType)
-        ESCoreExpr(dateLit).toFilter(xlateCtx, level + 1)
+      case StringLiteral(lit, _) :: Nil =>
+        ESColumnMap(SoQLFloatingTimestamp).toES(lit) match {
+          case JString(date) =>
+            val dateLit = StringLiteral(date, SoQLType)
+            ESCoreExpr(dateLit).toFilter(xlateCtx, level + 1)
+        }
       case _ => throw new RequireScriptFilter("Require script filter", fn.position)
     }
   }
 
-  def isNull[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def isNull(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case (col: ColumnRef[_]) :: Nil =>
         JObject1("missing", JObject1("field", ESCoreExpr(col).toFilter(xlateCtx, level+1)))
@@ -37,7 +68,7 @@ object ESFunction {
     }
   }
 
-  def isNotNull[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def isNotNull(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case (col: ColumnRef[_]) :: Nil =>
         JObject1("exists", JObject1("field", ESCoreExpr(col).toFilter(xlateCtx, level+1)))
@@ -45,7 +76,7 @@ object ESFunction {
     }
   }
 
-  def not[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def not(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case arg :: Nil =>
         JObject1("not", ESCoreExpr(arg).toFilter(xlateCtx, zeroStandaloneBooleanLevel(arg, level+1), canScript))
@@ -53,7 +84,7 @@ object ESFunction {
     }
   }
 
-  def in[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def in(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case (col: ColumnRef[_]) :: params =>
         ESCoreExpr(col).toFilter(xlateCtx, level + 1) match {
@@ -65,7 +96,7 @@ object ESFunction {
     }
   }
 
-  def notIn[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def notIn(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case (col: ColumnRef[_]) :: _ =>
         val fnc = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)
@@ -75,7 +106,7 @@ object ESFunction {
     }
   }
 
-  def equ[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def equ(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case SimpleColumnLiteralExpression(colLit) =>
         val lhs = ESCoreExpr(colLit.col).toFilter(xlateCtx, level+1)
@@ -86,12 +117,12 @@ object ESFunction {
     }
   }
 
-  def neq[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def neq(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Eq, fn.function.bindings), fn.parameters)
     JObject1("not", ESFunctionCall(deNegFn).toFilter(xlateCtx, level+1, canScript))
   }
 
-  def andOr[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def andOr(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val l = fn.parameters(0)
     val r = fn.parameters(1)
     val lhs = ESCoreExpr(l).toFilter(xlateCtx, zeroStandaloneBooleanLevel(l, level+1), canScript)
@@ -99,7 +130,7 @@ object ESFunction {
     JObject(Map(fn.function.name.name.substring(3) -> JArray(Seq(lhs, rhs))))
   }
 
-  def unaryMinus[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def unaryMinus(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     ESCoreExpr(fn.parameters(0)).toFilter(xlateCtx, level+1, canScript) match {
       case JNumber(x) => JNumber(-x)
       case JString(x) => JString("-" + x)
@@ -107,12 +138,12 @@ object ESFunction {
     }
   }
 
-  def notBetween[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def notBetween(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Between, fn.function.bindings), fn.parameters)
     JObject1("not", ESFunctionCall(deNegFn).toFilter(xlateCtx, level+1, canScript))
   }
 
-  def withinCircle[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def withinCircle(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val latLon = JObject(Map(
       "lat" -> ESCoreExpr(fn.parameters(1)).toFilter(xlateCtx, level+1),
       "lon" -> ESCoreExpr(fn.parameters(2)).toFilter(xlateCtx, level+1)) )
@@ -121,7 +152,7 @@ object ESFunction {
       "location" -> latLon)))
   }
 
-  def withinBox[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def withinBox(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val nwLatLon = JObject(Map(
       "lat" -> ESCoreExpr(fn.parameters(1)).toFilter(xlateCtx, level+1),
       "lon" -> ESCoreExpr(fn.parameters(2)).toFilter(xlateCtx, level+1)) )
@@ -140,7 +171,7 @@ object ESFunction {
     }
   }
 
-  def between[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def between(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case SimpleColumnLiteralExpression(colLit) if (colLit.lhsIsColumn) =>
         ESCoreExpr(colLit.col).toFilter(xlateCtx, level+1) match {
@@ -160,7 +191,7 @@ object ESFunction {
   /**
    * Handle >, >=, <, <=
    */
-  def lgte[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def lgte(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val inclusive = (fn.function.function == SoQLFunctions.Lte || fn.function.function == SoQLFunctions.Gte)
     fn.parameters match {
       case SimpleColumnLiteralExpression(colLit) =>
@@ -181,7 +212,7 @@ object ESFunction {
     }
   }
 
-  def like[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def like(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case (col: ColumnRef[_]) :: (lit: StringLiteral[_]) :: _ =>
         ESCoreExpr(col).toFilter(xlateCtx, level+1) match {
@@ -201,7 +232,7 @@ object ESFunction {
     }
   }
 
-  def notLike[T](fn: FunctionCall[T], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def notLike(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Like, fn.function.bindings), fn.parameters)
     JObject1("not", ESFunctionCall(deNegFn).toFilter(xlateCtx, level+1, canScript))
   }
@@ -209,7 +240,7 @@ object ESFunction {
   /**
    * Support "select * where booleanColumn (equivalent to select * where booleanColumn = true)
    */
-  private def zeroStandaloneBooleanLevel[T](expr: CoreExpr[T], level: Int): Int = {
+  private def zeroStandaloneBooleanLevel(expr: CoreExpr[_], level: Int): Int = {
     expr match {
       case col: ColumnRef[_] if (col.typ == SoQLBoolean) => 0
       case _ => level

@@ -10,7 +10,6 @@ import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
 import com.socrata.soql.exceptions.SoQLException
 import com.socrata.soql.adapter.SoQLAdapterException
 import java.io.InputStream
-import com.socrata.exceptions.unobtainium.InternalException
 
 object Main extends App {
 

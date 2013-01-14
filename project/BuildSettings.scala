@@ -1,3 +1,4 @@
+import com.socrata.socratasbt.SocrataSbt.SocrataUtil.{Is210, Is29}
 import sbt._
 import Keys._
 
@@ -8,7 +9,13 @@ import sbtassembly.AssemblyUtils.sourceOfFileForMerge
 
 object BuildSettings {
   val buildSettings: Seq[Setting[_]] = Defaults.defaultSettings ++ socrataBuildSettings ++ Seq(
-    scalaVersion := "2.9.2"
+    scalaVersion := "2.10.0",
+    crossScalaVersions := Seq("2.9.2", "2.10.0"),
+    scalacOptions <++= (scalaVersion) map {
+      case Is29() => Nil
+      case Is210() => Seq("-language:implicitConversions")
+    }
+
   )
 
   def projectSettings(assembly: Boolean = false) = buildSettings ++ socrataProjectSettings(assembly) ++

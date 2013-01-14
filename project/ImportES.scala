@@ -11,12 +11,12 @@ object ImportES {
   def libraries(implicit scalaVersion: String) = Seq(
     asyncHttpClient,
     commonsCli,
+    jodaConvert,
+    jodaTime,
     opencsv,
     rojomaJson,
     simpleArm,
     slf4jSimple,
-    socrataBlistMisc,
-    socrataCoreMisc,
     socrataUtil
   )
 }

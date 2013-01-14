@@ -10,10 +10,10 @@ object SoqlES {
 
   def libraries(implicit scalaVersion: String) = Seq(
     asyncHttpClient,
+    jodaConvert,
+    jodaTime,
     rojomaJson,
     slf4jSimple,
-    socrataBlistMisc,
-    socrataCoreMisc,
     socrataUtil,
     soqlStdlib
   )

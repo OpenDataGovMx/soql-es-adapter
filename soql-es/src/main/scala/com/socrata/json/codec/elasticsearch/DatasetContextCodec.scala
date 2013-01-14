@@ -6,7 +6,6 @@ import com.rojoma.json.matcher._
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.environment._
 import com.socrata.soql.types.SoQLType
-import org.apache.commons.lang.NotImplementedException
 
 class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[DatasetContext[SoQLType]] {
   import DatasetContextCodec._
@@ -44,10 +43,12 @@ class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[Dat
   }
 
   def encode(myObj: DatasetContext[SoQLType]): JValue = {
-    throw new NotImplementedException
+    throw new UnsupportedOperationException
   }
 
   def decode(jValue: JValue): Option[DatasetContext[SoQLType]] = {
+
+    import scala.language.existentials
 
     val optPath = if (resource.isDefined) Seq(resource.get) else Nil
 

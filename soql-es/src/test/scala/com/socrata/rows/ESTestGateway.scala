@@ -3,34 +3,33 @@ package com.socrata.rows
 import java.{lang => jl}
 
 import com.socrata.soql.types._
-import org.apache.commons.lang.NotImplementedException
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
 import com.socrata.soql.collection.OrderedMap
 
 class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) extends ESGateway {
 
-  def allocateID: Long = throw new NotImplementedException
+  def allocateID: Long = throw new UnsupportedOperationException
 
   def addRow(data: Map[String, AnyRef]) { addRow(data, allocateID) }
 
   def addRow(data: Map[String, AnyRef], id: jl.Long) {
-    throw new NotImplementedException
+    throw new UnsupportedOperationException
   }
 
   def flush() { }
 
   def deleteRow(id: jl.Long) {
-    throw new NotImplementedException
+    throw new UnsupportedOperationException
   }
 
-  def getRow(id: jl.Long): String = throw new NotImplementedException
+  def getRow(id: jl.Long): String = throw new UnsupportedOperationException
 
-  def getRows(limit: Int, offset: Long): String = throw new NotImplementedException
+  def getRows(limit: Int, offset: Long): String = throw new UnsupportedOperationException
 
-  def search(query: String): String = throw new NotImplementedException
+  def search(query: String): String = throw new UnsupportedOperationException
 
   def updateEsColumnMapping(cols: Map[String, ESColumnMap]) {
-    throw new NotImplementedException
+    throw new UnsupportedOperationException
   }
 
   def getDataContext(): DatasetContext[SoQLType] =

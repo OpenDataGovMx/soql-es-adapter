@@ -6,7 +6,6 @@ import com.rojoma.json.ast._
 import java.text.SimpleDateFormat
 import java.util.Date
 import scala.collection.{mutable => scm }
-import com.socrata.exceptions.unobtainium.InternalException
 import com.socrata.soql.types.SoQLType
 import com.rojoma.json.util.JsonUtil
 import com.socrata.json.codec.elasticsearch.DatasetContextCodec

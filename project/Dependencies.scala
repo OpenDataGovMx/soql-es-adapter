@@ -14,7 +14,7 @@ object Dependencies {
     val simpleArm = "1.1.10"
     val slf4j = "1.6.6"
     val socrataUtils = "0.6.0"
-    val soqlStdlib = "0.0.8"
+    val soqlStdlib = "0.0.10"
   }
 
   val asyncHttpClient = "com.ning" % "async-http-client" % versions.asyncHttpClient

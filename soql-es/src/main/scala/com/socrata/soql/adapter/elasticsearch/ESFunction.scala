@@ -53,7 +53,7 @@ object ESFunction {
       case StringLiteral(lit, _) :: Nil =>
         ESColumnMap(SoQLFloatingTimestamp).toES(lit) match {
           case JString(date) =>
-            val dateLit = StringLiteral(date, SoQLType)
+            val dateLit = StringLiteral(date, SoQLType)(fn.position)
             ESCoreExpr(dateLit).toFilter(xlateCtx, level + 1)
         }
       case _ => throw new RequireScriptFilter("Require script filter", fn.position)
@@ -99,7 +99,7 @@ object ESFunction {
   private def notIn(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
       case (col: ColumnRef[_]) :: _ =>
-        val fnc = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)
+        val fnc = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)(fn.position, fn.functionNamePosition)
         val deNegFn = ESFunctionCall(fnc)
         JObject1("not", deNegFn.toFilter(xlateCtx, level, canScript))
       case _ => throw new RequireScriptFilter("Require script filter", fn.position)
@@ -118,7 +118,7 @@ object ESFunction {
   }
 
   private def neq(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
-    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Eq, fn.function.bindings), fn.parameters)
+    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Eq, fn.function.bindings), fn.parameters)(fn.position, fn.functionNamePosition)
     JObject1("not", ESFunctionCall(deNegFn).toFilter(xlateCtx, level+1, canScript))
   }
 
@@ -139,7 +139,7 @@ object ESFunction {
   }
 
   private def notBetween(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
-    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Between, fn.function.bindings), fn.parameters)
+    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Between, fn.function.bindings), fn.parameters)(fn.position, fn.functionNamePosition)
     JObject1("not", ESFunctionCall(deNegFn).toFilter(xlateCtx, level+1, canScript))
   }
 
@@ -233,7 +233,7 @@ object ESFunction {
   }
 
   private def notLike(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
-    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Like, fn.function.bindings), fn.parameters)
+    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Like, fn.function.bindings), fn.parameters)(fn.position, fn.functionNamePosition)
     JObject1("not", ESFunctionCall(deNegFn).toFilter(xlateCtx, level+1, canScript))
   }
 

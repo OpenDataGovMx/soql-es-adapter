@@ -32,10 +32,13 @@ case class ESCoreExpr[+Type](coreExpr: CoreExpr[Type]) extends ESFilter {
       case ex: RequireScriptFilter =>
         if (canScript) {
           val (js, ctx) = toScript(xlateCtx, level)
+          val jsTryCatch =
+            if(ctx.get(XlateCtx.TryCatch).isDefined) "try { %s; } catch(e) { null; }".format(js)
+            else js
           JObject(Map("script" -> JObject(Map(
             // if ESLang is not set, we use default mvel.  Some expressions like casting require js
             "lang" -> JString(ctx.getOrElse(XlateCtx.ESLang, "mvel").asInstanceOf[String]),
-            "script" -> JString(js)
+            "script" -> JString(jsTryCatch)
           ))))
         }
         else if (level > 0) throw ex

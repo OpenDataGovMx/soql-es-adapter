@@ -3,8 +3,7 @@ package com.socrata.soql.adapter.elasticsearch
 import com.socrata.soql.adapter.{NotImplementedException, XlateCtx}
 import com.socrata.soql.functions.{SoQLFunctions}
 import com.socrata.soql.functions.SoQLFunctions._
-import com.socrata.soql.typed.ColumnRef
-import com.socrata.soql.typed.FunctionCall
+import com.socrata.soql.typed.{NumberLiteral, StringLiteral, ColumnRef, FunctionCall}
 import com.socrata.soql.functions.MonomorphicFunction
 import com.socrata.soql.environment.FunctionName
 
@@ -37,7 +36,11 @@ object ESScriptFunction {
     Lte.name -> infix _,
     Neq.name -> infix _,
     BangEq.name -> infix _,
-    Concat.name -> infix _
+    Concat.name -> infix _,
+
+    // shared between prop and index.
+    // prop and index have the same name.  Parameter type allows us to use the right function.
+    Prop.name -> propIndex _
   )
 
   private def isNull(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
@@ -97,7 +100,7 @@ object ESScriptFunction {
 
   private def notBetween(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Between, fn.function.bindings), fn.parameters)
+    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.Between, fn.function.bindings), fn.parameters)(fn.position, fn.functionNamePosition)
     val (child, childCtx) = ESCoreExpr(deNegFn).toScript(xlateCtx, level+1)
     ("(!%s)".format(child), childCtx)
   }
@@ -114,9 +117,30 @@ object ESScriptFunction {
 
   private def notIn(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
-    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)
+    val deNegFn = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)(fn.position, fn.functionNamePosition)
     val (child, childCtx) = ESCoreExpr(deNegFn).toScript(xlateCtx, level+1)
     ("(!%s)".format(child), childCtx)
+  }
+
+  private def propIndex(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
+    Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
+
+    fn.parameters match {
+      case Seq(ColumnRef(col, _), StringLiteral(prop, _)) =>
+        val script = s"_source.${col.name}.$prop"
+        (script, xlateCtx + requireJS + tryCatch)
+      case Seq(ColumnRef(col, _), NumberLiteral(prop, _)) =>
+        val script = s"_source.${col.name}[$prop]"
+        (script, xlateCtx + requireJS + tryCatch)
+      case Seq(head, StringLiteral(prop, _)) =>
+        val (script, childXlateCtx) = ESCoreExpr(head).toScript(xlateCtx, level+1)
+        (s"$script.$prop", childXlateCtx + requireJS + tryCatch)
+      case Seq(head, NumberLiteral(prop, _)) =>
+        val (script, childXlateCtx) = ESCoreExpr(head).toScript(xlateCtx, level+1)
+        (s"$script[$prop]", childXlateCtx + requireJS + tryCatch)
+      case _ =>
+        throw new NotImplementedException("", fn.position)
+    }
   }
 
   private def infix(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
@@ -133,6 +157,7 @@ object ESScriptFunction {
   }
 
   private val requireJS = (XlateCtx.ESLang -> "js")
+  private val tryCatch = (XlateCtx.TryCatch -> "t")
 
   private val scriptFnMap = Map(
     SoQLFunctions.Eq.name -> "==",

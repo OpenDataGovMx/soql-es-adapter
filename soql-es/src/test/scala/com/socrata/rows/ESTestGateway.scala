@@ -57,7 +57,9 @@ object ESTestGateway {
       ColumnName("fbi_code") -> SoQLText,
       ColumnName("year") -> SoQLNumber,
       ColumnName("location") -> SoQLLocation,
-      ColumnName("ward") -> SoQLMoney
+      ColumnName("ward") -> SoQLMoney,
+      ColumnName("object") -> SoQLObject,
+      ColumnName("array") -> SoQLArray
     )
   }
 }

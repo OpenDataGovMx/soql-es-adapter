@@ -517,6 +517,71 @@ class ESQueryTest extends FunSuite with MustMatchers {
         }
       """))
   }
+
+  test("property") {
+
+    toEsQuery("select * where object.prop1.prop2.prop3::text = 'one'") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "script" :
+                {
+                  "lang" : "js",
+                  "script" : "try { ((_source.object.prop1.prop2.prop3).toString() == \"one\"); } catch(e) { null; }"
+                }
+            }
+        }
+      """))
+  }
+
+  test("index") {
+
+    toEsQuery("select * where array[1][2][3]::number = 1") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "script" :
+                {
+                  "lang" : "js",
+                  "script" : "try { (parseFloat(_source.array[1][2][3]) == 1); } catch(e) { null; }"
+                }
+            }
+        }
+      """))
+  }
+
+  test("property and index") {
+
+    toEsQuery("select * where object.one[1]::number = 2") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "script" :
+                {
+                  "lang" : "js",
+                  "script" : "try { (parseFloat(_source.object.one[1]) == 2); } catch(e) { null; }"
+                }
+            }
+        }
+      """))
+
+    toEsQuery("select * where array[0].two[1]::text = 'one'") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "script" :
+                {
+                  "lang" : "js",
+                  "script" : "try { ((_source.array[0].two[1]).toString() == \"one\"); } catch(e) { null; }"
+                }
+            }
+        }
+      """))
+  }
 }
 
 object ESQueryTest {

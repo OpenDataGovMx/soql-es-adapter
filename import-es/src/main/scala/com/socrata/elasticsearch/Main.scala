@@ -83,7 +83,7 @@ object Main extends App {
               using(esGateway.search(qry)) { inputStream: InputStream =>
                 val (total, rowStream) = ESResultSet.parser(analysis.isGrouped, inputStream).rowStream()
                 println("\nResult total rows: %d, returned rows: %d".format(total.getOrElse(-1), rowStream.size))
-                println(rowStream.mkString("[", ",", "]"))
+                println(rowStream.mkString("[", ",\n", "]"))
               }
         }
       } catch {

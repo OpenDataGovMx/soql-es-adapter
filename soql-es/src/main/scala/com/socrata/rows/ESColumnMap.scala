@@ -33,6 +33,8 @@ object ESColumnMap {
       case SoQLNumber => esNumberLikeColumnMap
       case SoQLBoolean => esBooleanColumnMap
       case SoQLText => esTextLikeColumnMap
+      case SoQLObject => esObjectColumnMap
+      case SoQLArray => esArrayColumnMap
       case _ => esTextLikeColumnMap
     }
   }
@@ -43,6 +45,8 @@ object ESColumnMap {
   private val esDateColumnMap = new ESDateColumnMap()
   private val esLocationColumnMap = new ESLocationColumnMap()
   private val esBooleanColumnMap = new ESBooleanColumnMap()
+  private val esObjectColumnMap = new ESObjectColumnMap()
+  private val esArrayColumnMap = new ESArrayColumnMap()
 
   class ESTextLikeColumnMap extends ESColumnMap {
     def toES(data: AnyRef): AnyRef = JString(data.toString)
@@ -165,6 +169,46 @@ object ESColumnMap {
           JString(s"$lat,$lon")
         case _ =>
           JNull
+      }
+    }
+
+    override def fromES(data: AnyRef): AnyRef = {
+      data
+    }
+  }
+
+  class ESObjectColumnMap extends ESColumnMap {
+
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("object"),
+      "store" -> JString("yes"),
+      "dynamic" -> JBoolean(false)
+    ))
+
+    def toES(data: AnyRef) = {
+      data match {
+        case json: String => json
+        case _ => JNull
+      }
+    }
+
+    override def fromES(data: AnyRef): AnyRef = {
+      data
+    }
+  }
+
+  class ESArrayColumnMap extends ESColumnMap {
+
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("string"),
+      "index" -> JString("not_analyzed"),
+      "store" -> JString("yes")
+    ))
+
+    def toES(data: AnyRef) = {
+      data match {
+        case json: String => json
+        case _ => JNull
       }
     }
 

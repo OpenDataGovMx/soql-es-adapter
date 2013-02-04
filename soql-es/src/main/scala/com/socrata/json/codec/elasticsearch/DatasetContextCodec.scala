@@ -5,7 +5,7 @@ import com.rojoma.json.codec.JsonCodec
 import com.rojoma.json.matcher._
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.environment._
-import com.socrata.soql.types.SoQLType
+import com.socrata.soql.types.{SoQLArray, SoQLText, SoQLType}
 
 class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[DatasetContext[SoQLType]] {
   import DatasetContextCodec._
@@ -16,9 +16,11 @@ class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[Dat
 
   private val typeVar = Variable[String]()
   private val formatVar = Variable[String]()
+  private val indexVar = Variable[String]()
   private val fieldPat = PObject(
     "type" -> typeVar,
-    "format" -> POption(formatVar)
+    "format" -> POption(formatVar),
+    "index" -> POption(indexVar)
   )
 
   private def decodeType(v: JValue) = {
@@ -26,7 +28,19 @@ class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[Dat
       case fieldPat(result) =>
         val soqlTypeName = es2SoqlType(typeVar(result))
         val soqlType = SoQLType.typesByName(TypeName(soqlTypeName))
-        soqlType
+        soqlType match {
+          case SoQLText =>
+            // Elastic search array is quite simple, they claim.  But it is quite strange.
+            // Array is not a distinct type.  All datatypes have built in support of array.
+            // SoQL array is mapped to "not_analyzed" string.  This is the only case
+            // where elastic search type alone cannot resolve soda2.
+            // mapping index field can be used to tell apart array and string types.
+            indexVar.get(result) match {
+              case Some("not_analyzed") => SoQLArray
+              case _ => soqlType
+            }
+          case _ => soqlType
+        }
     }
   }
 
@@ -75,6 +89,7 @@ object DatasetContextCodec {
     "boolean" -> "boolean",
     "geo_point" -> "location",
     "date" -> "floating_timestamp",
-    "double" -> "number"
+    "double" -> "number",
+    "object" -> "object"
   )
 }

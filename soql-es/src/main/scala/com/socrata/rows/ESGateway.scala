@@ -15,9 +15,9 @@ import com.socrata.soql.environment.DatasetContext
 class GatewayException(message: String) extends Exception(message)
 
 trait ESGateway {
-  def addRow(data: Map[String, AnyRef])
+  def addRow(data: Map[String, Any])
 
-  def addRow(data: Map[String, AnyRef], id: jl.Long)
+  def addRow(data: Map[String, Any], id: jl.Long)
 
   def deleteRow(id: jl.Long)
 
@@ -56,9 +56,9 @@ class ESHttpGateway(val esIndex: String, val esType: String = "data",
     )
 
 
-  def addRow(data: Map[String, AnyRef]) { addRow(data, allocateID) }
+  def addRow(data: Map[String, Any]) { addRow(data, allocateID) }
 
-  def addRow(data: Map[String, AnyRef], id: jl.Long) {
+  def addRow(data: Map[String, Any], id: jl.Long) {
 
     totalRowsAdded += 1
     bufSize += 1

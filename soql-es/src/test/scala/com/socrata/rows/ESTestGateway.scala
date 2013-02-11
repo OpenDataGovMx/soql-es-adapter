@@ -10,9 +10,9 @@ class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) ext
 
   def allocateID: Long = throw new UnsupportedOperationException
 
-  def addRow(data: Map[String, AnyRef]) { addRow(data, allocateID) }
+  def addRow(data: Map[String, Any]) { addRow(data, allocateID) }
 
-  def addRow(data: Map[String, AnyRef], id: jl.Long) {
+  def addRow(data: Map[String, Any], id: jl.Long) {
     throw new UnsupportedOperationException
   }
 

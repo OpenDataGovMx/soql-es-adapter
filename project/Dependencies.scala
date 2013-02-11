@@ -12,10 +12,10 @@ object Dependencies {
     val scalaCheck_29 = "1.10.0"
     val scalaTest = "1.8"
     val simpleArm = "1.1.10"
-    val slf4j = "1.6.6"
     val socrataUtils = "0.6.0"
-    val soqlStdlib = "0.0.10"
+    val soqlStdlib = "0.0.11"
   }
+
 
   val asyncHttpClient = "com.ning" % "async-http-client" % versions.asyncHttpClient
 
@@ -32,10 +32,6 @@ object Dependencies {
   val scalaTest = "org.scalatest" %% "scalatest" % versions.scalaTest
 
   val simpleArm = "com.rojoma" %% "simple-arm" % versions.simpleArm
-
-  val slf4j = "org.slf4j" % "slf4j-api" % versions.slf4j
-
-  val slf4jSimple = "org.slf4j" % "slf4j-simple" % versions.slf4j
 
   val socrataUtil = "com.socrata" %% "socrata-utils" % versions.socrataUtils
 

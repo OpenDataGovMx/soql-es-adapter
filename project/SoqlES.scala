@@ -13,7 +13,6 @@ object SoqlES {
     jodaConvert,
     jodaTime,
     rojomaJson,
-    slf4jSimple,
     socrataUtil,
     soqlStdlib
   )

@@ -8,8 +8,8 @@ import com.socrata.soql.types._
 import com.socrata.soql.environment.TypeName
 
 trait ESColumnMap {
-  def toES(data: AnyRef): AnyRef
-  def fromES(data: AnyRef): AnyRef = data
+  def toES(data: Any): Any
+  def fromES(data: Any): Any = data
   def propMap: JValue = JObject(Map("type" -> JString("string")))
 }
 
@@ -49,7 +49,7 @@ object ESColumnMap {
   private val esArrayColumnMap = new ESArrayColumnMap()
 
   class ESTextLikeColumnMap extends ESColumnMap {
-    def toES(data: AnyRef): AnyRef = JString(data.toString)
+    def toES(data: Any): Any = JString(data.toString)
 
     override def propMap: JValue = JObject(Map(
       "type" -> JString("string"),
@@ -75,7 +75,7 @@ object ESColumnMap {
       "omit_norms" -> JBoolean(true)
     ))
 
-    override def toES(data: AnyRef): AnyRef =
+    override def toES(data: Any): Any =
       try {
         data match {
           case x: String =>
@@ -97,7 +97,7 @@ object ESColumnMap {
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: AnyRef) = Option(data) match {
+    def toES(data: Any) = Option(data) match {
       case Some(str: String) => JBoolean(jl.Boolean.parseBoolean(str))
       case _ => JNull
     }
@@ -117,7 +117,7 @@ object ESColumnMap {
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: AnyRef) = {
+    def toES(data: Any) = {
       data match {
         case Iso8601(s,r) =>
           val localDateTime = ISODateTimeFormat.dateTimeParser.parseLocalDateTime(s)
@@ -142,7 +142,7 @@ object ESColumnMap {
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: AnyRef) = {
+    def toES(data: Any) = {
       Option(data) match {
         case Some(s: String) =>
           val dateTime = tsParser.parseDateTime(data.toString)
@@ -163,7 +163,7 @@ object ESColumnMap {
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: AnyRef) = {
+    def toES(data: Any) = {
       data match {
         case fmt(lat, lon) =>
           JString(s"$lat,$lon")
@@ -172,7 +172,7 @@ object ESColumnMap {
       }
     }
 
-    override def fromES(data: AnyRef): AnyRef = {
+    override def fromES(data: Any): Any = {
       data
     }
   }
@@ -185,14 +185,14 @@ object ESColumnMap {
       "dynamic" -> JBoolean(false)
     ))
 
-    def toES(data: AnyRef) = {
+    def toES(data: Any) = {
       data match {
         case json: String => json
         case _ => JNull
       }
     }
 
-    override def fromES(data: AnyRef): AnyRef = {
+    override def fromES(data: Any): Any = {
       data
     }
   }
@@ -205,14 +205,14 @@ object ESColumnMap {
       "store" -> JString("yes")
     ))
 
-    def toES(data: AnyRef) = {
+    def toES(data: Any) = {
       data match {
         case json: String => json
         case _ => JNull
       }
     }
 
-    override def fromES(data: AnyRef): AnyRef = {
+    override def fromES(data: Any): Any = {
       data
     }
   }

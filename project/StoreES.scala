@@ -8,9 +8,6 @@ object StoreES {
   )
 
   def libraries(implicit scalaVersion: String) = Seq(
-    "com.typesafe" % "config" % "1.0.0",
-    "org.scalaz" %% "scalaz-core" % "7.0.0-M7",
-    "org.scalaz" %% "scalaz-effect" % "7.0.0-M7",
     dataCoordinator
   )
 }

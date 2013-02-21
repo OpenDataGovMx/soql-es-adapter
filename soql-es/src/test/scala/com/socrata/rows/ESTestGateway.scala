@@ -8,6 +8,8 @@ import com.socrata.soql.collection.OrderedMap
 
 class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) extends ESGateway {
 
+  def ensureIndex() = throw new UnsupportedOperationException
+
   def allocateID: Long = throw new UnsupportedOperationException
 
   def addRow(data: Map[String, Any]) { addRow(data, allocateID) }

@@ -7,6 +7,7 @@ import com.socrata.rows.{ESColumnMap, ESHttpGateway}
 import com.socrata.util.strings.CamelCase
 import java.util.zip.GZIPInputStream
 import com.rojoma.json.ast.JNull
+import com.socrata.es.meta.ESIndex
 
 object ESImport {
 
@@ -19,7 +20,7 @@ object ESImport {
     }
     val fileReader = new InputStreamReader(is)
 
-    val esGateway = new ESHttpGateway(resource, batchSize = batchSize, esBaseUrl = es)
+    val esGateway = new ESHttpGateway(ESIndex(resource), batchSize = batchSize, esBaseUrl = es)
 
     using (new CSVReader(fileReader)) { csv =>
       val headerName: Array[String] = csv.readNext().map(f =>

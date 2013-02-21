@@ -11,10 +11,13 @@ import com.rojoma.json.util.JsonUtil
 import com.socrata.json.codec.elasticsearch.DatasetContextCodec
 import java.io.InputStream
 import com.socrata.soql.environment.DatasetContext
+import com.socrata.es.meta.{ESType, ESIndex}
 
 class GatewayException(message: String) extends Exception(message)
 
 trait ESGateway {
+  def ensureIndex()
+
   def addRow(data: Map[String, Any])
 
   def addRow(data: Map[String, Any], id: jl.Long)
@@ -32,14 +35,14 @@ trait ESGateway {
   def flush(): Unit
 }
 
-class ESHttpGateway(val esIndex: String, val esType: String = "data",
+class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),
                     val batchSize: Int = 500,
                     val esBaseUrl: String = "http://localhost:9200"
                      ) extends ESGateway {
 
   import ESHttpGateway._
 
-  private val esDsUrl = "%1$s/%2$s/%3$s".format(esBaseUrl, esIndex, esType)
+  private val esDsUrl = s"$esBaseUrl/$esIndex/$esType"
 
   private var totalRowsAdded: Long = 0
 
@@ -109,7 +112,7 @@ class ESHttpGateway(val esIndex: String, val esType: String = "data",
   def updateEsColumnMapping(cols: Map[String, ESColumnMap]) {
     val propMap = cols.map { case (k, v) => k -> v.propMap }
     val jProperties = JObject(Map("properties" -> JObject(propMap)))
-    val jBody = JObject(Map(esIndex -> jProperties))
+    val jBody = JObject(Map(esIndex.raw -> jProperties))
     execute(Client.preparePost("%1$s/_mapping".format(esDsUrl)).setBody(jBody.toString))
   }
 
@@ -125,14 +128,14 @@ class ESHttpGateway(val esIndex: String, val esType: String = "data",
    * Create index if it does not exist
    */
   def ensureIndex() {
-    val url = "%s/%s".format(esBaseUrl, esIndex)
+    val url = s"$esBaseUrl/$esIndex"
     val response = Client.prepareHead(url).execute().get()
     response.getStatusCode match {
       case 404 =>
         execute(Client.preparePost(url))
       case sc if (sc >= 200 && sc <= 299) =>
       case _ =>
-        throw new Exception("Unknown problem with the index %s".format(esIndex))
+        throw new Exception(s"Unknown problem with the index $esIndex")
     }
   }
 }

@@ -14,6 +14,7 @@ object Dependencies {
     val simpleArm = "1.1.10"
     val socrataUtils = "0.6.0"
     val soqlStdlib = "0.0.11"
+    val dataCoordinator = "0.0.1-SNAPSHOT"
   }
 
 
@@ -36,4 +37,6 @@ object Dependencies {
   val socrataUtil = "com.socrata" %% "socrata-utils" % versions.socrataUtils
 
   val soqlStdlib = "com.socrata" %% "soql-stdlib" % versions.soqlStdlib
+
+  val dataCoordinator = "com.socrata" %% "coordinator" % versions.dataCoordinator
 }

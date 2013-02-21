@@ -6,7 +6,7 @@ object Build extends sbt.Build {
     "soql-es-adapter",
     file("."),
     settings = BuildSettings.buildSettings //++ BuildSettings.sonatypeSettings
-  ) aggregate (allOtherProjects: _*) dependsOn(soqlES, importES)
+  ) aggregate (allOtherProjects: _*) dependsOn(soqlES, importES, storeES)
 
   private def allOtherProjects =
     for {
@@ -19,5 +19,5 @@ object Build extends sbt.Build {
 
   lazy val soqlES = p("soql-es", SoqlES)
   lazy val importES = p("import-es", ImportES) dependsOn(soqlES)
-
+  lazy val storeES = p("store-es", StoreES) dependsOn(soqlES)
 }

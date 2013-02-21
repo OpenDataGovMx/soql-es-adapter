@@ -10,6 +10,7 @@ import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
 import com.socrata.soql.exceptions.SoQLException
 import com.socrata.soql.adapter.SoQLAdapterException
 import java.io.InputStream
+import com.socrata.es.meta.ESIndex
 
 object Main extends App {
 
@@ -52,7 +53,7 @@ object Main extends App {
 
   private def esSoqlPrompt() {
     var limit: Option[BigInt] = None
-    var esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
+    var esGateway = new ESHttpGateway(ESIndex(resource.get), esBaseUrl = es)
     var esQuery = new ESQuery(resource.get, esGateway, limit)
 
 
@@ -72,7 +73,7 @@ object Main extends App {
             }
           case switchDatasetCmd(name) =>
             resource = Some(name)
-            esGateway = new ESHttpGateway(resource.get, esBaseUrl = es)
+            esGateway = new ESHttpGateway(ESIndex(resource.get), esBaseUrl = es)
             esQuery = new ESQuery(resource.get, esGateway, limit)
           case limitCmd(lim) =>
             limit = Some(BigInt(lim))

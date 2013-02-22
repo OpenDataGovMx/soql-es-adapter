@@ -10,7 +10,7 @@ import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
 import com.socrata.soql.exceptions.SoQLException
 import com.socrata.soql.adapter.SoQLAdapterException
 import java.io.InputStream
-import com.socrata.es.meta.ESIndex
+import com.socrata.es.meta.{ESType, ESIndex}
 
 object Main extends App {
 
@@ -53,11 +53,11 @@ object Main extends App {
 
   private def esSoqlPrompt() {
     var limit: Option[BigInt] = None
-    var esGateway = new ESHttpGateway(ESIndex(resource.get), esBaseUrl = es)
+    var esGateway = new ESHttpGateway(ESIndex(resource.get), ESType("data"), esBaseUrl = es)
     var esQuery = new ESQuery(resource.get, esGateway, limit)
 
-
-    val switchDatasetCmd = """switch\s+(.+)""".r
+    // switch datasetName version
+    val switchDatasetCmd = """switch\s+(.+)\s+(.+)""".r
     val limitCmd = """limit\s+(.+)""".r
 
     while(true) {
@@ -71,9 +71,9 @@ object Main extends App {
             for( ((colName, soqlType), idx) <- ctx.schema.zipWithIndex) {
               println("%d: %s: %s".format(idx + 1, colName.name, soqlType.name.name))
             }
-          case switchDatasetCmd(name) =>
+          case switchDatasetCmd(name, typ) =>
             resource = Some(name)
-            esGateway = new ESHttpGateway(ESIndex(resource.get), esBaseUrl = es)
+            esGateway = new ESHttpGateway(ESIndex(resource.get), ESType(typ), esBaseUrl = es)
             esQuery = new ESQuery(resource.get, esGateway, limit)
           case limitCmd(lim) =>
             limit = Some(BigInt(lim))

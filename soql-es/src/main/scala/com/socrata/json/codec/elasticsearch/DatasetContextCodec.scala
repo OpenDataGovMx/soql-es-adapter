@@ -6,8 +6,9 @@ import com.rojoma.json.matcher._
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.environment._
 import com.socrata.soql.types.{SoQLArray, SoQLText, SoQLType}
+import com.socrata.es.meta.ESType
 
-class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[DatasetContext[SoQLType]] {
+class DatasetContextCodec(resource: Option[String] = None, esType: ESType) extends JsonCodec[DatasetContext[SoQLType]] {
   import DatasetContextCodec._
 
   implicit val schemalessDatasetContext = new SchemalessDatasetContext {
@@ -66,7 +67,7 @@ class DatasetContextCodec(resource: Option[String] = None) extends JsonCodec[Dat
 
     val optPath = if (resource.isDefined) Seq(resource.get) else Nil
 
-    skipToValue(Some(jValue), optPath ++ Seq("data", "properties")) match {
+    skipToValue(Some(jValue), optPath ++ Seq(esType.raw, "properties")) match {
       case Some(jo : JObject) =>
         val datasetContext = new DatasetContext[SoQLType] {
           implicit val ctx = this

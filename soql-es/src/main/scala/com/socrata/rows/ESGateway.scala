@@ -11,7 +11,7 @@ import com.rojoma.json.util.JsonUtil
 import com.socrata.json.codec.elasticsearch.DatasetContextCodec
 import java.io.InputStream
 import com.socrata.soql.environment.DatasetContext
-import com.socrata.es.meta.{ESType, ESIndex}
+import com.socrata.es.meta.{DatasetMeta, ESType, ESIndex}
 
 class GatewayException(message: String) extends Exception(message)
 
@@ -119,10 +119,24 @@ class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),
   def getDataContext(): DatasetContext[SoQLType] = {
     val url = "%1$s/_mapping".format(esDsUrl)
     val result = execute(Client.prepareGet(url))
-    implicit val dsCtxCodec = new DatasetContextCodec()
+    implicit val dsCtxCodec = new DatasetContextCodec(esType = esType)
     val dsCtx: DatasetContext[SoQLType] = JsonUtil.parseJson(result).get
     dsCtx
   }
+
+  def getDatasetMeta(): Option[DatasetMeta] = {
+    val result = execute(Client.prepareGet(metaUrl))
+    import DatasetMeta.datasetMetaJCodec
+    JsonUtil.parseJson(result)
+  }
+
+  def setDatasetMeta(datasetMeta: DatasetMeta) {
+    import DatasetMeta.datasetMetaJCodec
+    val body = JsonUtil.renderJson(datasetMeta)
+    execute(Client.preparePost(metaUrl).setBody(body))
+  }
+
+  private def metaUrl = s"$esBaseUrl/$esIndex/meta/1"
 
   /**
    * Create index if it does not exist

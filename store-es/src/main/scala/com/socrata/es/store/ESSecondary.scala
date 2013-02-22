@@ -5,22 +5,20 @@ import com.socrata.datacoordinator.util.collection.ColumnIdMap
 import com.socrata.es.rows.Converter
 import com.socrata.rows.{ESGateway, ESColumnMap, ESHttpGateway}
 import com.socrata.datacoordinator.truth.metadata._
-import com.socrata.datacoordinator.truth.loader.Delogger
-import com.socrata.datacoordinator.truth.loader.Delogger.{ColumnCreated, WorkingCopyCreated, RowDataUpdated, LogEvent}
+import com.socrata.datacoordinator.truth.loader.Delogger._
 import com.socrata.datacoordinator.id.{RowId, DatasetId, CopyId}
 import com.socrata.datacoordinator.secondary.Secondary
 import com.socrata.datacoordinator.Row
 import com.socrata.datacoordinator.common.soql.{SoQLRowLogCodec, SoQLTypeContext}
-import com.socrata.datacoordinator.truth.metadata.ColumnInfo
-import com.socrata.datacoordinator.truth.loader.Update
-import com.socrata.es.meta.ESIndex
-import com.socrata.datacoordinator.truth.loader.Delete
-import com.socrata.datacoordinator.truth.metadata.CopyInfo
-import com.socrata.datacoordinator.truth.loader.Insert
-import com.socrata.es.meta.ESType
 import com.socrata.datacoordinator.truth.loader.sql.SqlDelogger
 import java.sql.Connection
 import sql.PostgresDatasetMapReader
+import com.socrata.datacoordinator.truth.metadata.ColumnInfo
+import com.socrata.datacoordinator.truth.loader._
+import com.socrata.datacoordinator.truth.metadata.CopyInfo
+import com.socrata.datacoordinator.truth.loader.Insert
+import com.socrata.es.meta.{DatasetMeta, ESIndex, ESType}
+
 
 class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
 
@@ -28,9 +26,13 @@ class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
 
   private val rowConverter = implicitly[Converter[CV]]
 
-  // TODO: Store currrent version in Elasticsearch /index/meta
-  def currentVersion(datasetID: DatasetId): Long =
-    throw new NotImplementedError()
+  /**
+   * Return the copy version sored in Elasticsearch /index/meta
+   * The Elasticsearch call does not care about ESType here.
+   */
+  def currentVersion(datasetID: DatasetId): Long = {
+    (new ESHttpGateway(datasetID)).getDatasetMeta.map(_.copyId).getOrElse(0)
+  }
 
   def wantsSnapshots = false
 
@@ -61,10 +63,13 @@ class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
         createCopy(copyInfo)
       case ColumnCreated(info: UnanchoredColumnInfo) =>
         createColumn(copyInfo, info)
+      case RowIdentifierSet(_) => // nothing to do
+      case RowIdentifierCleared(_) => // nothing to do
       case otherOps =>
         // TODO:
         println(s"ignore: $otherOps")
     }}
+    esGateway.setDatasetMeta(copyInfo)
   }
 
   private def createCopy(copyInfo: CopyInfo) {
@@ -89,6 +94,8 @@ object ESSecondary {
   implicit def datasetIdToESIndex(datasetId: DatasetId): ESIndex = ESIndex(s"ds${datasetId.underlying}")
 
   implicit def versionToIndexType(version: CopyId): ESType = ESType(s"v${version.underlying}")
+
+  implicit def copyInfoToDatasetMeta(copyInfo: CopyInfo): DatasetMeta = DatasetMeta(copyInfo.systemId.underlying, copyInfo.dataVersion)
 
   private def getESGateway(copyInfo: CopyInfo) =
     new ESHttpGateway(copyInfo.datasetInfo.systemId, copyInfo.systemId)

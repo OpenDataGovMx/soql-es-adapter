@@ -14,7 +14,8 @@ object SoqlES {
     jodaTime,
     rojomaJson,
     socrataUtil,
-    soqlStdlib
+    soqlStdlib,
+    dataCoordinator
   )
 }
 

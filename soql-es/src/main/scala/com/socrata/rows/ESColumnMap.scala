@@ -6,6 +6,7 @@ import org.joda.time.DateTimeZone
 import com.rojoma.json.ast._
 import com.socrata.soql.types._
 import com.socrata.soql.environment.TypeName
+import com.socrata.datacoordinator.id.RowId
 
 trait ESColumnMap {
   def toES(data: Any): Any
@@ -35,6 +36,7 @@ object ESColumnMap {
       case SoQLText => esTextLikeColumnMap
       case SoQLObject => esObjectColumnMap
       case SoQLArray => esArrayColumnMap
+      case SoQLID => esIdColumnMap
       case _ => esTextLikeColumnMap
     }
   }
@@ -47,6 +49,7 @@ object ESColumnMap {
   private val esBooleanColumnMap = new ESBooleanColumnMap()
   private val esObjectColumnMap = new ESObjectColumnMap()
   private val esArrayColumnMap = new ESArrayColumnMap()
+  private val esIdColumnMap = new ESIdColumnMap()
 
   class ESTextLikeColumnMap extends ESColumnMap {
     def toES(data: Any): Any = JString(data.toString)
@@ -86,6 +89,27 @@ object ESColumnMap {
       } catch {
         case e: NumberFormatException =>
           JNull
+      }
+  }
+
+  class ESIdColumnMap extends ESNumberLikeColumnMap {
+    override def propMap: JValue = JObject(Map(
+      "type" -> JString("double"),
+      "store" -> JString("yes"),
+      "omit_norms" -> JBoolean(true)
+    ))
+
+    override def toES(data: Any): Any =
+      try {
+        val vdata = data match {
+          case rowId: RowId => rowId.underlying
+          case id: String => java.lang.Long.parseLong(id)
+          case id => java.lang.Long.parseLong(id.toString)
+        }
+        JNumber(vdata)
+      } catch {
+        case e: NumberFormatException => JNull
+        case e: NullPointerException => JNull
       }
   }
 

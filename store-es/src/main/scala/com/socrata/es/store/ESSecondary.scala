@@ -6,7 +6,7 @@ import com.socrata.es.rows.Converter
 import com.socrata.rows.{ESGateway, ESColumnMap, ESHttpGateway}
 import com.socrata.datacoordinator.truth.metadata._
 import com.socrata.datacoordinator.truth.loader.Delogger._
-import com.socrata.datacoordinator.id.{RowId, DatasetId, CopyId}
+import com.socrata.datacoordinator.id.{ColumnId, RowId, DatasetId, CopyId}
 import com.socrata.datacoordinator.secondary.Secondary
 import com.socrata.datacoordinator.Row
 import com.socrata.datacoordinator.common.soql.{SoQLRowLogCodec, SoQLTypeContext}
@@ -18,7 +18,6 @@ import com.socrata.datacoordinator.truth.loader._
 import com.socrata.datacoordinator.truth.metadata.CopyInfo
 import com.socrata.datacoordinator.truth.loader.Insert
 import com.socrata.es.meta.{DatasetMeta, ESIndex, ESType}
-
 
 class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
 
@@ -36,9 +35,16 @@ class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
 
   def wantsSnapshots = false
 
-  // TODO:
   def resync(copyInfo: CopyInfo, schema: ColumnIdMap[ColumnInfo], rows: Iterator[com.socrata.datacoordinator.Row[CV]]) {
-    throw new NotImplementedError()
+    val sidColumnInfo: ColumnInfo = schema.values.find(_.logicalName == ":id").get
+    val esGateway: ESHttpGateway = getESGateway(copyInfo)
+    createSchema(esGateway, schema)
+    rows.foreach { row =>
+      val rowId = rowConverter.rowId(sidColumnInfo, row).get
+      upsert(schema, esGateway, rowId, row)
+    }
+    esGateway.flush()
+    esGateway.setDatasetMeta(copyInfo)
   }
 
   def version(copyInfo: CopyInfo, events: Iterator[Delogger.LogEvent[CV]]) {
@@ -87,6 +93,19 @@ class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
     val row = rowConverter.toRow(schema, data)
     esGateway.addRow(row, sid.underlying)
   }
+
+  private def createSchema(esGateway: ESGateway, schema: ColumnIdMap[ColumnInfo]) {
+    val esColumnsMap = schema.foldLeft(Map.empty[String, ESColumnMap]) { (map, colIdColInfo) =>
+      colIdColInfo match {
+        case (colId, colInfo) =>
+          val colName = colInfo.physicalColumnBaseBase
+          map + (colName -> ESColumnMap(SoQLTypeContext.typeFromName(colInfo.typeName)))
+      }
+    }
+    esGateway.ensureIndex()
+    esGateway.deleteType()
+    esGateway.updateEsColumnMapping(esColumnsMap)
+  }
 }
 
 object ESSecondary {
@@ -129,6 +148,20 @@ object ESSecondary {
         using(delogger.delog(copyInfo.dataVersion)) { logEventIter =>
           secondary.version(copyInfo, logEventIter)
         }
+      case None =>
+        println(s"cannot find datases $datasetName")
+    }
+  }
+
+  def resyncSecondary(datasetName: String, schema: ColumnIdMap[ColumnInfo], conn: Connection, rows: Iterator[ColumnIdMap[_]]) {
+
+    val datasetMapReader = new PostgresDatasetMapReader(conn)
+
+    datasetMapReader.datasetInfo(datasetName) match {
+      case Some(datasetInfo) =>
+        val copyInfo: CopyInfo = datasetMapReader.latest(datasetInfo)
+        val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any](conn)
+        secondary.resync(copyInfo, schema, rows)
       case None =>
         println(s"cannot find datases $datasetName")
     }

@@ -32,6 +32,8 @@ trait ESGateway {
 
   def getDataContext(): DatasetContext[SoQLType]
 
+  def deleteType()
+
   def flush(): Unit
 }
 
@@ -150,6 +152,18 @@ class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),
       case sc if (sc >= 200 && sc <= 299) =>
       case _ =>
         throw new Exception(s"Unknown problem with the index $esIndex")
+    }
+  }
+
+  def deleteType() {
+    val response = Client.prepareDelete(esDsUrl).execute().get()
+    response.getStatusCode match {
+      case 404 =>
+        println("delete non-existing index " + esDsUrl)
+      case sc if (sc >= 200 && sc <= 299) =>
+        println("delete existing index index " + esDsUrl)
+      case sc =>
+        throw new Exception(s"error in deleting index $esDsUrl status code: $sc")
     }
   }
 }

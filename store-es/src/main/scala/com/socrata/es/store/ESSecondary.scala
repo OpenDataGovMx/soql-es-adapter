@@ -61,14 +61,17 @@ class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
           case Update(sid, row) =>
             upsert(schema, esGateway, sid, row)
           case Delete(sid) =>
-            //TODO:
-            println(s"ignore delete $sid")
+            delete(esGateway, sid)
         }
         esGateway.flush()
       case WorkingCopyCreated(datasetInfo: UnanchoredDatasetInfo, unanchoredCopyInfo: UnanchoredCopyInfo) =>
         createCopy(copyInfo)
       case ColumnCreated(info: UnanchoredColumnInfo) =>
         createColumn(copyInfo, info)
+      case SnapshotDropped(info: UnanchoredCopyInfo) =>
+        esGateway.deleteType()
+      case ColumnRemoved(_) | WorkingCopyCreated(_, _) =>
+        throw new UnsupportedOperationException("call resync when publish is called")
       case RowIdentifierSet(_) => // nothing to do
       case RowIdentifierCleared(_) => // nothing to do
       case otherOps =>
@@ -92,6 +95,10 @@ class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
   private def upsert(schema: ColumnIdMap[ColumnInfo], esGateway: ESGateway, sid: RowId, data: Row[CV]) {
     val row = rowConverter.toRow(schema, data)
     esGateway.addRow(row, sid.underlying)
+  }
+
+  private def delete(esGateway: ESGateway, sid: RowId) {
+    esGateway.deleteRow(sid.underlying)
   }
 
   private def createSchema(esGateway: ESGateway, schema: ColumnIdMap[ColumnInfo]) {

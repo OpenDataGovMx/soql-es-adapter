@@ -1,9 +1,9 @@
 package com.socrata.soql.adapter.elasticsearch
 
-import com.socrata.soql.adapter.{NotImplementedException, XlateCtx}
+import com.socrata.soql.adapter.{SoQLAdapterException, NotImplementedException, XlateCtx}
 import com.rojoma.json.ast._
 import com.socrata.soql.functions.SoQLFunctions
-import com.socrata.soql.types.{SoQLFloatingTimestamp, SoQLBoolean, SoQLType}
+import com.socrata.soql.types.{SoQLText, SoQLFloatingTimestamp, SoQLBoolean, SoQLType}
 import com.socrata.soql.typed._
 import com.socrata.soql.typed.StringLiteral
 import com.rojoma.json.ast.JObject
@@ -15,6 +15,7 @@ import com.rojoma.json.ast.JString
 import com.socrata.soql.functions.MonomorphicFunction
 import com.socrata.rows.ESColumnMap
 import com.socrata.soql.environment.FunctionName
+import com.socrata.soql.ast.SpecialFunctions
 
 object ESFunction {
 
@@ -22,6 +23,9 @@ object ESFunction {
   import SoQLFunctions._
 
   def apply(functionName: FunctionName) = funMap.get(functionName)
+
+  // These functions are not supported in SoQL Analysis yet.
+  val Search = new MonomorphicFunction(SpecialFunctions.Operator("search"), Seq(SoQLText), None, SoQLBoolean)
 
   private val funMap = Map(
     IsNull.name -> isNull _,
@@ -46,7 +50,8 @@ object ESFunction {
     Gt.name -> lgte _,
     Gte.name -> lgte _,
     Like.name -> like _,
-    NotLike.name -> notLike _)
+    NotLike.name -> notLike _,
+    Search.function.name -> search _)
 
   private def textToFloatingTimestamp(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
@@ -244,6 +249,18 @@ object ESFunction {
     expr match {
       case col: ColumnRef[_] if (col.typ == SoQLBoolean) => 0
       case _ => level
+    }
+  }
+
+  private def search(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+    fn.parameters match {
+      case StringLiteral(s, _) :: Nil =>
+        JObject(Map("query" ->
+          JObject(Map("query_string" ->
+            JObject(Map( "default_field" -> JString("_all") , "query" -> JString(s)))
+            ))))
+      case _ =>
+        throw new SoQLAdapterException("unexpected search argument type", fn.position)
     }
   }
 }

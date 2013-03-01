@@ -30,6 +30,8 @@ class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) ext
 
   def search(query: String): String = throw new UnsupportedOperationException
 
+  def deleteType() { throw new UnsupportedOperationException }
+
   def updateEsColumnMapping(cols: Map[String, ESColumnMap]) {
     throw new UnsupportedOperationException
   }

@@ -13,7 +13,7 @@ object Dependencies {
     val scalaTest = "1.8"
     val simpleArm = "1.1.10"
     val socrataUtils = "0.6.0"
-    val soqlStdlib = "0.0.11"
+    val soqlStdlib = "0.0.12"
     val dataCoordinator = "0.0.1-SNAPSHOT"
   }
 

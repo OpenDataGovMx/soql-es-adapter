@@ -582,6 +582,41 @@ class ESQueryTest extends FunSuite with MustMatchers {
         }
       """))
   }
+
+  test("search") {
+    toEsQuery("select * search 'WEather'") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "query" :
+                { "query_string" : { "default_field" : "_all", "query" : "WEather" } }
+            }
+        }
+      """))
+  }
+
+  test("search and where") {
+    toEsQuery("select * where id = 123 search 'WEather'") must equal(json(
+      """
+        {
+          "filter" :
+            {
+              "and" :
+                [
+                  { "term" : { "id" : 123 } },
+                  {
+                    "query" :
+                      {
+                        "query_string" :
+                          { "default_field" : "_all", "query" : "WEather" }
+                      }
+                  }
+                ]
+            }
+        }
+      """))
+  }
 }
 
 object ESQueryTest {

@@ -2,19 +2,17 @@ package com.socrata.soql.adapter.elasticsearch
 
 import com.socrata.soql.typed._
 import com.rojoma.json.ast._
-import com.socrata.soql.adapter.{SoQLAdapterException, XlateCtx, NotImplementedException, SoqlAdapter}
+import com.socrata.soql.adapter.{XlateCtx, NotImplementedException, SoqlAdapter}
 import com.socrata.rows.ESGateway
 import com.socrata.soql.collection.{OrderedSet, OrderedMap}
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
 import com.socrata.soql.types._
 import com.socrata.soql.SoQLAnalyzer
-import com.socrata.soql.typed.OrderBy
 import com.rojoma.json.ast.JObject
 import com.rojoma.json.ast.JArray
-import com.socrata.soql.typed.ColumnRef
-import com.socrata.soql.typed.FunctionCall
-import com.rojoma.json.ast.JString
 import com.socrata.soql.functions.{SoQLFunctions, SoQLTypeInfo, SoQLFunctionInfo, MonomorphicFunction}
+import com.socrata.soql.parsing.SoQLPosition
+import com.rojoma.json.ast.JString
 
 class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Option[BigInt] = Some(1000)) extends SoqlAdapter[String] {
 
@@ -44,7 +42,9 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
 
     val analysis = analyzer.analyzeFullQuery(soql)
     val xlateCtx: Map[XlateCtx.Value, AnyRef] = Map(XlateCtx.LowercaseStringLiteral -> Boolean.box(true))
-    val esFilter = analysis.where.map(toESFilter(_, xlateCtx, canScript = true))
+
+    val whereAndSearch = andWhereSearch(analysis.where, analysis.search)
+    val esFilter = whereAndSearch.map(toESFilter(_, xlateCtx, canScript = true))
     val esFilterOrQuery = esFilter.map { filter =>
     // A top filter apply independently of facets
     // Must wrap in a query in order to affect facets.
@@ -75,6 +75,33 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     val esObjectProps = esObjectPropsSomeValuesMayBeEmpty.collect { case (k, v) if v.isDefined => (k, v.get) }
     val esObject = JObject(esObjectProps)
     Tuple2(esObject.toString, analysis) //.replace("\n", " ")
+  }
+
+  private def andWhereSearch(whereOpt: Option[CoreExpr[SoQLType]], searchOpt: Option[String]): Option[CoreExpr[SoQLType]] = {
+
+    val lostPos = new SoQLPosition(0, 0, "", 0)
+
+    def searchToExpr(search: String) = {
+      FunctionCall[SoQLType](
+        ESFunction.Search,
+        Seq(StringLiteral(search, SoQLType)(lostPos).asInstanceOf[CoreExpr[SoQLType]]))(lostPos, lostPos)
+    }
+
+    def and(lhs: CoreExpr[SoQLType], rhs: CoreExpr[SoQLType]) = {
+      val fAnd = new MonomorphicFunction(SoQLFunctions.And.name, Seq(SoQLBoolean, SoQLBoolean), None, SoQLBoolean)
+      FunctionCall[SoQLType](fAnd, Seq(lhs, rhs))(lostPos, lostPos)
+    }
+
+    (whereOpt, searchOpt) match {
+      case (Some(where), None) =>
+        whereOpt
+      case (None, Some(search)) =>
+        Some(searchToExpr(search))
+      case (Some(where), Some(search)) =>
+        Some(and(where, searchToExpr(search)))
+      case (None, None) =>
+        None
+    }
   }
 
   private def toESOffset(offset: BigInt) = JNumber(offset)

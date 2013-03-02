@@ -11,15 +11,16 @@ import com.socrata.datacoordinator.secondary.Secondary
 import com.socrata.datacoordinator.Row
 import com.socrata.datacoordinator.common.soql.{SoQLRowLogCodec, SoQLTypeContext}
 import com.socrata.datacoordinator.truth.loader.sql.SqlDelogger
-import java.sql.Connection
 import sql.PostgresDatasetMapReader
-import com.socrata.datacoordinator.truth.metadata.ColumnInfo
+import com.socrata.datacoordinator.truth._
 import com.socrata.datacoordinator.truth.loader._
-import com.socrata.datacoordinator.truth.metadata.CopyInfo
-import com.socrata.datacoordinator.truth.loader.Insert
-import com.socrata.es.meta.{DatasetMeta, ESIndex, ESType}
+import com.socrata.es.meta.DatasetMeta
+import com.rojoma.simplearm._
+import com.socrata.es.meta.{ESIndex, ESType}
+import java.sql.Connection
 
-class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
+
+class ESSecondary[CV: Converter](conn: Option[Connection]) extends Secondary[CV] {
 
   import ESSecondary._
 
@@ -33,25 +34,35 @@ class ESSecondary[CV: Converter](conn: Connection) extends Secondary[CV] {
     (new ESHttpGateway(datasetID)).getDatasetMeta.map(_.copyId).getOrElse(0)
   }
 
-  def wantsSnapshots = false
+  def wantsWorkingCopies = false
 
-  def resync(copyInfo: CopyInfo, schema: ColumnIdMap[ColumnInfo], rows: Iterator[com.socrata.datacoordinator.Row[CV]]) {
+  def dropSnapshot(datasetId: DatasetId, copyNumber: Long) {
+    getESGateway(datasetId, copyNumber).deleteType()
+  }
+
+  def snapshots(datasetId: DatasetId): Set[Long] = {
+    throw new NotImplementedError()
+  }
+
+  def resync(copyInfo: CopyInfo, schema: ColumnIdMap[ColumnInfo], rows: Managed[Iterator[Row[CV]]]) {
     val sidColumnInfo: ColumnInfo = schema.values.find(_.logicalName == ":id").get
-    val esGateway: ESHttpGateway = getESGateway(copyInfo)
+    val esGateway = getESGateway(copyInfo)
     createSchema(esGateway, schema)
-    rows.foreach { row =>
+
+    for (iter <- rows; row <- iter) {
       val rowId = rowConverter.rowId(sidColumnInfo, row).get
       upsert(schema, esGateway, rowId, row)
     }
+
     esGateway.flush()
     esGateway.setDatasetMeta(copyInfo)
   }
 
-  def version(copyInfo: CopyInfo, events: Iterator[Delogger.LogEvent[CV]]) {
-    val esGateway = getESGateway(copyInfo)
+  def version(datasetId: DatasetId, dataVersion: Long, events: Iterator[Delogger.LogEvent[CV]]) {
 
     // TODO: consider validating schema or getting schema from Elasticsearch
-    val schema = schemaFromPg(conn, copyInfo)
+    val (copyInfo, schema) = schemaFromPg(conn.getOrElse(throw new Exception("need connection")), this, datasetId)
+    val esGateway = getESGateway(copyInfo)
 
     events.foreach { (rowDataOperation: LogEvent[CV]) => rowDataOperation match {
       case r@RowDataUpdated(xxx) =>
@@ -119,21 +130,25 @@ object ESSecondary {
 
   implicit def datasetIdToESIndex(datasetId: DatasetId): ESIndex = ESIndex(s"ds${datasetId.underlying}")
 
-  implicit def versionToIndexType(version: CopyId): ESType = ESType(s"v${version.underlying}")
+  implicit def copyIdToIndexType(version: CopyId): ESType = versionToIndexType(version.underlying)
+
+  implicit def versionToIndexType(version: Long): ESType = ESType(s"v${version}")
 
   implicit def copyInfoToDatasetMeta(copyInfo: CopyInfo): DatasetMeta = DatasetMeta(copyInfo.systemId.underlying, copyInfo.dataVersion)
 
-  private def getESGateway(copyInfo: CopyInfo) =
-    new ESHttpGateway(copyInfo.datasetInfo.systemId, copyInfo.systemId)
+  private def getESGateway(copyInfo: CopyInfo): ESGateway =
+    getESGateway(copyInfo.datasetInfo.systemId, copyInfo.systemId.underlying)
 
-  private def schemaFromPg(conn: Connection, copyInfo: CopyInfo) = {
+  private def getESGateway(datasetId: DatasetId, copyId: Long): ESGateway =
+    new ESHttpGateway(datasetId,  copyId)
+
+  private def schemaFromPg(conn: Connection, secondary: Secondary[_], datasetId: DatasetId) = {
     val datasetMapReader = new PostgresDatasetMapReader(conn)
-
-    Option(copyInfo.datasetInfo.systemId).flatMap(datasetMapReader.datasetInfo).flatMap(datasetMapReader.copyNumber(_, copyInfo.copyNumber)) match {
-      case Some(ci) => datasetMapReader.schema(ci)
-      case _ => throw new Exception("schema not found")
-    }
+    val datasetInfo: DatasetInfo = datasetMapReader.datasetInfo(datasetId).get
+    val copyInfo = datasetMapReader.copyNumber(datasetInfo, secondary.currentVersion(datasetInfo.systemId)).get
+    (copyInfo, datasetMapReader.schema(copyInfo))
   }
+
 
   private def toESColumn(colInfo: UnanchoredColumnInfo) = {
     (colInfo.physicalColumnBaseBase -> ESColumnMap(SoQLTypeContext.typeFromName(colInfo.typeName)))
@@ -149,11 +164,11 @@ object ESSecondary {
         println( s"copyDataVersion: ${copyInfo.dataVersion}")
         println( s"copyNumber: ${copyInfo.copyNumber}")
 
-        val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any](conn)
+        val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any](Some(conn))
         val delogger: Delogger[Any] = new SqlDelogger(conn, datasetInfo.logTableName, () => SoQLRowLogCodec)
 
         using(delogger.delog(copyInfo.dataVersion)) { logEventIter =>
-          secondary.version(copyInfo, logEventIter)
+          secondary.version(copyInfo.datasetInfo.systemId, copyInfo.copyNumber, logEventIter)
         }
       case None =>
         println(s"cannot find datases $datasetName")
@@ -167,8 +182,13 @@ object ESSecondary {
     datasetMapReader.datasetInfo(datasetName) match {
       case Some(datasetInfo) =>
         val copyInfo: CopyInfo = datasetMapReader.latest(datasetInfo)
-        val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any](conn)
-        secondary.resync(copyInfo, schema, rows)
+        val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any](Some(conn))
+        val managedRows = new {
+          private val r = rows
+        } with SimpleArm[Iterator[ColumnIdMap[_]]] {
+          def flatMap[A](f: Iterator[ColumnIdMap[_]] => A): A = f(r)
+        }
+        secondary.resync(copyInfo, schema, managedRows)
       case None =>
         println(s"cannot find datases $datasetName")
     }

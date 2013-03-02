@@ -12,6 +12,7 @@ object Dependencies {
     val scalaCheck_29 = "1.10.0"
     val scalaTest = "1.8"
     val simpleArm = "1.1.10"
+    val socrataCsv = "1.1.0"
     val socrataUtils = "0.6.0"
     val soqlStdlib = "0.0.12"
     val dataCoordinator = "0.0.1-SNAPSHOT"
@@ -38,5 +39,9 @@ object Dependencies {
 
   val soqlStdlib = "com.socrata" %% "soql-stdlib" % versions.soqlStdlib
 
-  val dataCoordinator = "com.socrata" %% "coordinator" % versions.dataCoordinator
+  val socrataCsv = "com.socrata" %% "socrata-csv" % versions.socrataCsv
+
+  val coordinatorlib = "com.socrata" %% "coordinatorlib" % versions.dataCoordinator
+
+  val coordinatorlibSoql = "com.socrata" %% "coordinatorlib-soql" % versions.dataCoordinator
 }

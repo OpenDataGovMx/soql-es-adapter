@@ -15,7 +15,8 @@ object SoqlES {
     rojomaJson,
     socrataUtil,
     soqlStdlib,
-    dataCoordinator
+    coordinatorlib,
+    coordinatorlibSoql
   )
 }
 

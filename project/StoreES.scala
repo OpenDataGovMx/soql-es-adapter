@@ -8,7 +8,9 @@ object StoreES {
   )
 
   def libraries(implicit scalaVersion: String) = Seq(
-    dataCoordinator
+    coordinatorlib,
+    coordinatorlibSoql,
+    socrataCsv
   )
 }
 

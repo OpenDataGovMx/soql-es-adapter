@@ -35,6 +35,10 @@ trait ESGateway {
   def deleteType()
 
   def flush(): Unit
+
+  def getDatasetMeta(): Option[DatasetMeta]
+
+  def setDatasetMeta(datasetMeta: DatasetMeta)
 }
 
 class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),

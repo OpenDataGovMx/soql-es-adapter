@@ -12,6 +12,7 @@ import com.socrata.json.codec.elasticsearch.DatasetContextCodec
 import java.io.InputStream
 import com.socrata.soql.environment.DatasetContext
 import com.socrata.es.meta.{DatasetMeta, ESType, ESIndex}
+import com.rojoma.json.io.JsonReader
 
 class GatewayException(message: String) extends Exception(message)
 
@@ -32,6 +33,8 @@ trait ESGateway {
 
   def getDataContext(): DatasetContext[SoQLType]
 
+  def deleteIndex()
+
   def deleteType()
 
   def flush(): Unit
@@ -39,6 +42,8 @@ trait ESGateway {
   def getDatasetMeta(): Option[DatasetMeta]
 
   def setDatasetMeta(datasetMeta: DatasetMeta)
+
+  def copies: Set[Long]
 }
 
 class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),
@@ -142,20 +147,54 @@ class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),
     execute(Client.preparePost(metaUrl).setBody(body))
   }
 
+  def copies: Set[Long] = {
+    val url = s"$indexUrl/_mapping"
+    val s = execute(Client.prepareGet(url))
+
+    JsonReader.fromString(s) match {
+      case JObject(fields) =>
+        val muSet = fields(esIndex.raw) match {
+          case JObject(fields) =>
+            val CopyNumberRx = "v([0-9]+)".r
+            fields.keySet.collect {
+              case CopyNumberRx(copyNumber) => copyNumber.toLong
+            }
+          case _ =>
+            Set.empty[Long]
+        }
+        muSet.toSet // make immutable
+      case _ =>
+        Set.empty[Long]
+    }
+  }
+
   private def metaUrl = s"$esBaseUrl/$esIndex/meta/1"
+
+  private def indexUrl = s"$esBaseUrl/$esIndex"
 
   /**
    * Create index if it does not exist
    */
   def ensureIndex() {
-    val url = s"$esBaseUrl/$esIndex"
-    val response = Client.prepareHead(url).execute().get()
+    val response = Client.prepareHead(indexUrl).execute().get()
     response.getStatusCode match {
       case 404 =>
-        execute(Client.preparePost(url))
+        execute(Client.preparePost(indexUrl))
       case sc if (sc >= 200 && sc <= 299) =>
       case _ =>
         throw new Exception(s"Unknown problem with the index $esIndex")
+    }
+  }
+
+  def deleteIndex() {
+    val response = Client.prepareDelete(indexUrl).execute().get()
+    response.getStatusCode match {
+      case 404 =>
+        println("delete non-existing index " + indexUrl)
+      case sc if (sc >= 200 && sc <= 299) =>
+        println("delete existing index " + indexUrl)
+      case sc =>
+        throw new Exception(s"error in deleting index $esDsUrl status code: $sc")
     }
   }
 
@@ -163,9 +202,9 @@ class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),
     val response = Client.prepareDelete(esDsUrl).execute().get()
     response.getStatusCode match {
       case 404 =>
-        println("delete non-existing index " + esDsUrl)
+        println("delete non-existing index type" + esDsUrl)
       case sc if (sc >= 200 && sc <= 299) =>
-        println("delete existing index index " + esDsUrl)
+        println("delete existing index type" + esDsUrl)
       case sc =>
         throw new Exception(s"error in deleting index $esDsUrl status code: $sc")
     }

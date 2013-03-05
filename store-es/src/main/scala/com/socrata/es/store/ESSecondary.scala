@@ -184,23 +184,19 @@ object ESSecondary {
     }}
   }
 
-  def resyncSecondary(datasetName: String, schema: ColumnIdMap[ColumnInfo], conn: Connection, rows: Iterator[ColumnIdMap[_]]) {
-
-    val datasetMapReader = new PostgresDatasetMapReader(conn)
-
-    for (datasetId <- datasetMapReader.datasetId(datasetName)) {
-      datasetMapReader.datasetInfo(datasetId) match {
-        case Some(datasetInfo) =>
-          val copyInfo: CopyInfo = datasetMapReader.latest(datasetInfo)
-          val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any](Some(conn))
-          val managedRows = new {
-            private val r = rows
-          } with SimpleArm[Iterator[ColumnIdMap[_]]] {
-            def flatMap[A](f: Iterator[ColumnIdMap[_]] => A): A = f(r)
-          }
-          secondary.resync(copyInfo, schema, managedRows)
-        case None =>
-          println(s"cannot find datases $datasetName")
-    }}
-  }
+  def resyncSecondary(datasetName: String, schema: ColumnIdMap[ColumnInfo], dataContext: DataReadingContext, rows: Iterator[ColumnIdMap[_]]) {
+    for {
+      ctxOpt <-  dataContext.datasetReader.openDataset(datasetName, true)
+      ctx <- ctxOpt
+    } {
+      val ci: CopyInfo = ctx.copyInfo
+      val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any]()
+      val managedRows = new {
+        private val r = rows
+      } with SimpleArm[Iterator[ColumnIdMap[_]]] {
+        def flatMap[A](f: Iterator[ColumnIdMap[_]] => A): A = f(r)
+      }
+      secondary.resync(ci, schema, managedRows)
+    }
+ }
 }

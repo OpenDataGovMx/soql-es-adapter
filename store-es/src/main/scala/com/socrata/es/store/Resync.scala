@@ -3,7 +3,7 @@ package com.socrata.es.store
 import com.socrata.datacoordinator.truth.DataReadingContext
 import com.socrata.datacoordinator.common.soql.PostgresSoQLDataContext
 
-class SecondaryResync(val dataContext: DataReadingContext with PostgresSoQLDataContext) {
+class SecondaryResync(val dataContext: DataReadingContext) {
 
   def resync(id: String): Boolean = {
     val res = for {
@@ -12,7 +12,7 @@ class SecondaryResync(val dataContext: DataReadingContext with PostgresSoQLDataC
     } yield {
       import ctx._
       withRows { it =>
-        ESSecondary.resyncSecondary(id, schema, dataContext.dataSource.getConnection, it)
+        ESSecondary.resyncSecondary(id, schema, dataContext, it)
       }
     }
     res.isDefined

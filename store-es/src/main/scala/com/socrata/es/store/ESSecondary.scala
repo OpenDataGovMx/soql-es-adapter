@@ -20,6 +20,8 @@ import com.socrata.es.meta.{ESIndex, ESType}
 import java.sql.Connection
 
 
+class ESSecondaryAny() extends ESSecondary[Any]()
+
 class ESSecondary[CV: Converter](conn: Option[Connection]) extends Secondary[CV] {
 
   import ESSecondary._

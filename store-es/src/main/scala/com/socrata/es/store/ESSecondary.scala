@@ -26,6 +26,8 @@ class ESSecondary[CV: Converter](conn: Option[Connection]) extends Secondary[CV]
 
   private val rowConverter = implicitly[Converter[CV]]
 
+  def this() = this(None)
+
   /**
    * Return the copy version sored in Elasticsearch /index/meta
    * The Elasticsearch call does not care about ESType here.

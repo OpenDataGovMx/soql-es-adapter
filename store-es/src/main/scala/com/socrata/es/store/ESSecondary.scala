@@ -32,7 +32,7 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
 
   private val rowConverter = implicitly[Converter[CV]]
 
-  private val cfg = config.getConfig("com.socrata.coordinator-service.es")
+  private val cfg = config.getConfig("es")
 
   private val esBaseUrl = cfg.getString("url")
 

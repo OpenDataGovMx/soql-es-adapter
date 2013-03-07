@@ -1,1 +1,4 @@
-{ "class" : "com.socrata.es.store.ESSecondaryAny" }
+{
+  "class" : "com.socrata.es.store.ESSecondaryAny",
+  "name" : "es"
+}

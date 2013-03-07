@@ -15,9 +15,9 @@ object Dependencies {
     val socrataCsv = "1.1.0"
     val socrataUtils = "0.6.0"
     val soqlStdlib = "0.0.12"
+    val typesafeConfig = "1.0.0"
     val dataCoordinator = "0.0.1-SNAPSHOT"
   }
-
 
   val asyncHttpClient = "com.ning" % "async-http-client" % versions.asyncHttpClient
 
@@ -40,6 +40,8 @@ object Dependencies {
   val soqlStdlib = "com.socrata" %% "soql-stdlib" % versions.soqlStdlib
 
   val socrataCsv = "com.socrata" %% "socrata-csv" % versions.socrataCsv
+
+  val typesafeConfig = "com.typesafe" % "config" % versions.typesafeConfig
 
   val coordinatorlib = "com.socrata" %% "coordinatorlib" % versions.dataCoordinator % "provided"
 

@@ -143,7 +143,7 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
   }
 
   private def getESGateway(copyInfo: CopyInfo): ESGateway =
-    getESGateway(copyInfo.datasetInfo.systemId, copyInfo.systemId.underlying)
+    getESGateway(copyInfo.datasetInfo.systemId, copyInfo.copyNumber)
 
   private def getESGateway(datasetId: DatasetId, copyId: Long = 0): ESGateway =
     new ESHttpGateway(datasetId,  copyId, esBaseUrl = esBaseUrl)
@@ -157,7 +157,7 @@ object ESSecondary {
 
   implicit def versionToIndexType(version: Long): ESType = ESType(s"v${version}")
 
-  implicit def copyInfoToDatasetMeta(copyInfo: CopyInfo): DatasetMeta = DatasetMeta(copyInfo.systemId.underlying, copyInfo.dataVersion)
+  implicit def copyInfoToDatasetMeta(copyInfo: CopyInfo): DatasetMeta = DatasetMeta(copyInfo.copyNumber, copyInfo.dataVersion)
 
   private def schemaFromPg(conn: Connection, secondary: Secondary[_], datasetId: DatasetId) = {
     val datasetMapReader = new PostgresDatasetMapReader(conn)

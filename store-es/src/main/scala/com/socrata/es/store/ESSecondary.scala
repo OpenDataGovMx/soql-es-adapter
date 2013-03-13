@@ -32,9 +32,7 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
 
   private val rowConverter = implicitly[Converter[CV]]
 
-  private val cfg = config.getConfig("es")
-
-  private val esBaseUrl = cfg.getString("url")
+  private val esBaseUrl = config.getString("url")
 
   /**
    * Return the copy version sored in Elasticsearch /index/meta

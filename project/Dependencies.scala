@@ -14,7 +14,7 @@ object Dependencies {
     val simpleArm = "1.1.10"
     val socrataCsv = "1.1.0"
     val socrataUtils = "0.6.0"
-    val soqlStdlib = "0.0.12"
+    val soqlStdlib = "[0.0.12,0.0.15)"
     val typesafeConfig = "1.0.0"
     val dataCoordinator = "0.0.1-SNAPSHOT"
   }

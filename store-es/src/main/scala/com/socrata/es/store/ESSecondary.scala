@@ -39,6 +39,10 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
    * The Elasticsearch call does not care about ESType here.
    */
   def currentVersion(datasetId: DatasetId, cookie: Cookie): Long = {
+    getESGateway(datasetId).getDatasetMeta.map(_.version).getOrElse(0)
+  }
+
+  def currentCopyNumber(datasetId: DatasetId, cookie: Cookie): Long = {
     getESGateway(datasetId).getDatasetMeta.map(_.copyId).getOrElse(0)
   }
 
@@ -160,7 +164,7 @@ object ESSecondary {
   private def schemaFromPg(conn: Connection, secondary: Secondary[_], datasetId: DatasetId) = {
     val datasetMapReader = new PostgresDatasetMapReader(conn)
     val datasetInfo: DatasetInfo = datasetMapReader.datasetInfo(datasetId).get
-    val copyInfo = datasetMapReader.copyNumber(datasetInfo, secondary.currentVersion(datasetInfo.systemId, None)).get
+    val copyInfo = datasetMapReader.copyNumber(datasetInfo, secondary.currentCopyNumber(datasetInfo.systemId, None)).get
     (copyInfo, datasetMapReader.schema(copyInfo))
   }
 

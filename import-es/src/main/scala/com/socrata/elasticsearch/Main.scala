@@ -82,7 +82,7 @@ object Main extends App {
               val (qry, analysis) = esQuery.full(cmd)
               println("\nElastic Search Query String:\n" + qry)
               using(esGateway.search(qry)) { inputStream: InputStream =>
-                val (total, rowStream) = ESResultSet.parser(analysis.isGrouped, inputStream).rowStream()
+                val (total, rowStream) = ESResultSet.parser(analysis, inputStream).rowStream()
                 println("\nResult total rows: %d, returned rows: %d".format(total.getOrElse(-1), rowStream.size))
                 println(rowStream.mkString("[", ",\n", "]"))
               }

@@ -5,6 +5,7 @@ import java.{lang => jl}
 import com.socrata.soql.types._
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
 import com.socrata.soql.collection.OrderedMap
+import com.socrata.es.meta.DatasetMeta
 
 class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) extends ESGateway {
 
@@ -30,6 +31,8 @@ class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) ext
 
   def search(query: String): String = throw new UnsupportedOperationException
 
+  def deleteIndex() { throw new UnsupportedOperationException }
+
   def deleteType() { throw new UnsupportedOperationException }
 
   def updateEsColumnMapping(cols: Map[String, ESColumnMap]) {
@@ -38,6 +41,12 @@ class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) ext
 
   def getDataContext(): DatasetContext[SoQLType] =
     datasetContext.getOrElse(ESTestGateway.datasetCtx)
+
+  def getDatasetMeta(): Option[DatasetMeta] = { throw new UnsupportedOperationException }
+
+  def setDatasetMeta(datasetMeta: DatasetMeta) { throw new UnsupportedOperationException }
+
+  def copies: Set[Long]  = { throw new UnsupportedOperationException }
 }
 
 object ESTestGateway {

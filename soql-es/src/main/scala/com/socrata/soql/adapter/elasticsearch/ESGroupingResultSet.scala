@@ -4,15 +4,51 @@ import com.rojoma.json.io._
 import java.io.InputStream
 import java.nio.charset.Charset
 import annotation.tailrec
-import com.rojoma.json.ast.{JValue, JObject}
+import com.rojoma.json.ast.{JArray, JValue, JObject}
 import com.socrata.soql.collection.OrderedMap
 import com.rojoma.json.codec.JsonCodec
+import com.socrata.soql.SoQLAnalyzer
+import com.socrata.soql.types.SoQLType
 
-class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
-  extends ESPlainResultSet(inputStream, charset) {
+class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream: InputStream, charset: Charset)
+  extends ESPlainResultSet(analysis, inputStream, charset) {
 
   import ESResultSet._
   import ESGroupingResultSet._
+
+
+  import ExprGroupResultName._
+
+  private val isMultiGroup: Boolean = analysis.groupBy.map(_.size > 1).getOrElse(false)
+
+  private val groupIndexMap = {
+    val exprIndexs = analysis.groupBy.get.zipWithIndex
+    analysis.selection.map { case (colName, expr) =>
+        colName -> exprIndexs.find { (exprIdx) => exprIdx._1 == expr }.map { (exprIdx) => exprIdx._2 }
+    }
+  }
+
+  /**
+   * Make output from single - group (statFacet) and multi - groups (columnFacet) output
+   * to look like select output
+   * Multi group keys are in array like { ... _multi : [ group_col1_val, group_col2_val, ... ] ... }
+   * TODO: scripts/expressions are not handled yet because it may require a totally different implementation throughout the stack
+   */
+  override def select(map: Map[String, JValue]): Map[String, JValue] = {
+
+    analysis.selection.map { case (colName, expr) =>
+      if (isMultiGroup) {
+        groupIndexMap(colName) match {
+          case Some(groupIdx) =>
+            colName.name -> map("_multi").asInstanceOf[JArray](groupIdx)
+          case None =>
+            colName.name -> map(expr.toName)
+        }
+      } else {
+        colName.name -> map(expr.toName)
+      }
+    }
+  }
 
   /**
    * Unlike regular query, there is no free total row count for facet.
@@ -22,7 +58,10 @@ class ESGroupingResultSet(inputStream: InputStream, charset: Charset)
     if (!lexer.hasNext) throw new JsonParserEOF(lexer.head.position)
     val (total, facetsResult) = parseFacets(lexer)
     // TODO: Facets result may not be sorted in the right order yet.
-    (total, facetsResult.values.toStream)
+    val selectedColumnsResult =
+      if (honorSelect) facetsResult.values.view.map { jo => JObject(select(jo.toMap)) }
+      else facetsResult.values
+    (total, selectedColumnsResult.toStream)
   }
 
   @tailrec

@@ -4,9 +4,12 @@ import com.rojoma.json.io._
 import java.io.{InputStreamReader, InputStream}
 import java.nio.charset.Charset
 import annotation.tailrec
-import com.rojoma.json.ast.JObject
+import com.rojoma.json.ast.{JValue, JObject}
 import com.rojoma.json.codec.JsonCodec
 import com.rojoma.json.codec.JsonCodec._
+import com.socrata.soql.SoQLAnalyzer
+import com.socrata.soql.types.SoQLType
+import com.socrata.soql.environment.ColumnName
 
 
 class ESJsonBadParse(event: JsonEvent, expect: JsonEvent) extends
@@ -24,7 +27,7 @@ trait ESResultSet {
   def rowStream(): Tuple2[Option[Long], Stream[JObject]]
 }
 
-class ESPlainResultSet(inputStream: InputStream, charset: Charset) extends ESResultSet {
+class ESPlainResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream: InputStream, charset: Charset) extends ESResultSet {
 
   import ESResultSet._
 
@@ -35,6 +38,18 @@ class ESPlainResultSet(inputStream: InputStream, charset: Charset) extends ESRes
   protected val lexer = new JsonEventIterator(tokenIter)
 
   protected val jsonReader = new JsonReader(lexer)
+
+  protected val honorSelect = true
+
+  private val selection = analysis.selection.keySet.map(_.name)
+
+  /**
+   * Restrict ES _source output to selected columns
+   * TODO: scripts/expressions are not handled yet because it is likely to require a totally different processor.
+   * @param map
+   * @return
+   */
+  def select(map: Map[String, JValue]): Map[String, JValue] = map.filterKeys(selection.contains(_))
 
   def rowStream(): Tuple2[Option[Long], Stream[JObject]] = {
     skipToField(lexer, Seq("hits", "total"))
@@ -50,13 +65,16 @@ class ESPlainResultSet(inputStream: InputStream, charset: Charset) extends ESRes
   }
 
   protected def resultStream(reader: JsonReader): Stream[JObject] = {
+
     if (reader.lexer.head.isInstanceOf[EndOfArrayEvent]) Stream.empty
     else
       reader.read() match {
         case JObject(outerRow) =>
           outerRow("_source") match {
             case jo@JObject(_) =>
-              jo #:: resultStream(reader)
+              if (honorSelect) JObject(select(jo.toMap)) #:: resultStream(reader)
+              else jo #:: resultStream(reader)
+
             case _ => throw new ESJsonBadParse(reader.lexer.head, StartOfObjectEvent())
           }
         case _ => throw new ESJsonBadParse(reader.lexer.head, StartOfObjectEvent())
@@ -66,9 +84,9 @@ class ESPlainResultSet(inputStream: InputStream, charset: Charset) extends ESRes
 
 object ESResultSet {
 
-  def parser(isGrouped: Boolean, inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8.charSet): ESResultSet =
-    if (isGrouped) new ESGroupingResultSet(inputStream, charset)
-    else new ESPlainResultSet(inputStream, charset)
+  def parser(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8.charSet): ESResultSet =
+    if (analysis.isGrouped) new ESGroupingResultSet(analysis, inputStream, charset)
+    else new ESPlainResultSet(analysis, inputStream, charset)
 
   @tailrec
   def skipToField(lexer: JsonEventIterator, field: String): Boolean = {

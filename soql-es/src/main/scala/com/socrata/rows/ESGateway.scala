@@ -12,9 +12,9 @@ import com.socrata.json.codec.elasticsearch.DatasetContextCodec
 import java.io.InputStream
 import com.socrata.soql.environment.DatasetContext
 import com.socrata.es.meta.{DatasetMeta, ESType, ESIndex}
+import com.socrata.es.exception._
 import com.rojoma.json.io.JsonReader
 
-class GatewayException(message: String) extends Exception(message)
 
 trait ESGateway {
   def ensureIndex()
@@ -229,7 +229,7 @@ object ESHttpGateway {
     try {
       val response: Response = rf.get()
       if (response.getStatusCode < 200 || response.getStatusCode > 299) {
-        throw new GatewayException(response.getStatusText)
+        throw GatewayException(response.getStatusCode, response.getStatusText)
       }
       response
     } catch {

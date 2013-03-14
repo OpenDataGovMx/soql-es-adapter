@@ -2,6 +2,7 @@ package com.socrata.es.store
 
 import com.rojoma.simplearm.util._
 import com.socrata.datacoordinator.util.collection.ColumnIdMap
+import com.socrata.es.exception._
 import com.socrata.es.rows.Converter
 import com.socrata.rows.{ESGateway, ESColumnMap, ESHttpGateway}
 import com.socrata.datacoordinator.truth.metadata._
@@ -41,11 +42,21 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
    * The Elasticsearch call does not care about ESType here.
    */
   def currentVersion(datasetId: DatasetId, cookie: Cookie): Long = {
-    getESGateway(datasetId).getDatasetMeta.map(_.version).getOrElse(0)
+    try {
+      getESGateway(datasetId).getDatasetMeta.map(_.version).getOrElse(0)
+    } catch {
+      case e: GatewayNotFound =>
+        0
+    }
   }
 
   def currentCopyNumber(datasetId: DatasetId, cookie: Cookie): Long = {
-    getESGateway(datasetId).getDatasetMeta.map(_.copyId).getOrElse(0)
+    try {
+      getESGateway(datasetId).getDatasetMeta.map(_.copyId).getOrElse(0)
+    } catch {
+      case e: GatewayNotFound =>
+        0
+    }
   }
 
   def wantsWorkingCopies = false
@@ -60,7 +71,11 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
   }
 
   def snapshots(datasetId: DatasetId, cookie: Cookie): Set[Long] = {
-    getESGateway(datasetId).copies
+    try {
+      getESGateway(datasetId).copies
+    } catch {
+      case e: GatewayNotFound => Set.empty[Long]
+    }
   }
 
   def resync(copyInfo: CopyInfo, cookie: Cookie, schema: ColumnIdMap[ColumnInfo], rows: Managed[Iterator[Row[CV]]]): Cookie = {

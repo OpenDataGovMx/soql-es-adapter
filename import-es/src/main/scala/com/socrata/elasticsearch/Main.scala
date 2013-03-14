@@ -4,8 +4,9 @@ import org.apache.commons.cli.Options
 import org.apache.commons.cli.CommandLineParser
 import org.apache.commons.cli.PosixParser
 import com.rojoma.simplearm.util._
+import com.socrata.es.exception._
 import com.socrata.injest.ESImport
-import com.socrata.rows.{GatewayException, ESHttpGateway}
+import com.socrata.rows.ESHttpGateway
 import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
 import com.socrata.soql.exceptions.SoQLException
 import com.socrata.soql.adapter.SoQLAdapterException

@@ -34,6 +34,8 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
 
   private val esBaseUrl = config.getString("url")
 
+  def shutdown() { /* Nothing for this store */ }
+
   /**
    * Return the copy version sored in Elasticsearch /index/meta
    * The Elasticsearch call does not care about ESType here.

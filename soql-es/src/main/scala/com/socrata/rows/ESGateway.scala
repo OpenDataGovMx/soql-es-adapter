@@ -43,6 +43,8 @@ trait ESGateway {
 
   def setDatasetMeta(datasetMeta: DatasetMeta)
 
+  def search(query: String): InputStream
+
   def copies: Set[Long]
 }
 

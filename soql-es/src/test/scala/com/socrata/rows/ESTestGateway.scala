@@ -6,6 +6,7 @@ import com.socrata.soql.types._
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.es.meta.DatasetMeta
+import java.io.InputStream
 
 class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) extends ESGateway {
 
@@ -29,7 +30,7 @@ class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) ext
 
   def getRows(limit: Int, offset: Long): String = throw new UnsupportedOperationException
 
-  def search(query: String): String = throw new UnsupportedOperationException
+  def search(query: String): InputStream = throw new UnsupportedOperationException
 
   def deleteIndex() { throw new UnsupportedOperationException }
 

@@ -14,11 +14,12 @@ import com.socrata.soql.functions.{SoQLFunctions, SoQLTypeInfo, SoQLFunctionInfo
 import com.socrata.soql.parsing.SoQLPosition
 import com.rojoma.json.ast.JString
 
-class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Option[BigInt] = Some(1000)) extends SoqlAdapter[String] {
+class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Option[BigInt] = Some(1000),
+              context: Option[DatasetContext[SoQLType]] = None) extends SoqlAdapter[String] {
 
   import ESQuery._
 
-  private lazy val dsCtx = esGateway.getDataContext()
+  private lazy val dsCtx = context.getOrElse(esGateway.getDataContext())
 
   def full(soql: String) = toQuery(dsCtx, soql)
 

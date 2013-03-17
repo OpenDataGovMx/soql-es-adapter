@@ -21,15 +21,16 @@ import com.rojoma.simplearm._
 import com.socrata.es.meta.{ESIndex, ESType}
 import java.sql.Connection
 import com.typesafe.config.{ConfigFactory, Config}
+import java.io.InputStream
+import com.socrata.soql.adapter.elasticsearch.ESResultSet
 
 
 class ESSecondaryAny(config: Config) extends ESSecondary[Any](config)
 
-class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) extends Secondary[CV] {
-
-  def this(config: Config) = this(config, None)
+class ESSecondary[CV: Converter](config: Config) extends Secondary[CV] with ESSchemaLoader {
 
   import ESSecondary._
+  import ESScheme._
 
   private val rowConverter = implicitly[Converter[CV]]
 
@@ -81,7 +82,7 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
   def resync(copyInfo: CopyInfo, cookie: Cookie, schema: ColumnIdMap[ColumnInfo], rows: Managed[Iterator[Row[CV]]]): Cookie = {
     val sidColumnInfo: ColumnInfo = schema.values.find(_.logicalName == ":id").get
     val esGateway = getESGateway(copyInfo)
-    createSchema(esGateway, schema)
+    createSchema(copyInfo.datasetInfo.systemId, esGateway, schema)
 
     for (iter <- rows; row <- iter) {
       val rowId = rowConverter.rowId(sidColumnInfo, row).get
@@ -96,8 +97,9 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
   def version(datasetId: DatasetId, dataVersion: Long, cookie: Cookie, events: Iterator[Delogger.LogEvent[CV]]): Cookie = {
 
     // TODO: consider validating schema or getting schema from Elasticsearch
-    val (copyInfo, schema) = schemaFromPg(conn.getOrElse(throw new Exception("need connection")), this, datasetId)
-    val esGateway = getESGateway(copyInfo)
+    val copyId = currentCopyNumber(datasetId, cookie)
+    val esGateway = getESGateway(datasetId, copyId)
+    val schema = loadColumnIdNameMap(datasetId, esGateway)
 
     events.foreach { (rowDataOperation: LogEvent[CV]) => rowDataOperation match {
       case r@RowDataUpdated(xxx) =>
@@ -111,9 +113,10 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
         }
         esGateway.flush()
       case WorkingCopyCreated(datasetInfo: UnanchoredDatasetInfo, unanchoredCopyInfo: UnanchoredCopyInfo) =>
-        createCopy(copyInfo)
+        createCopy(datasetInfo, unanchoredCopyInfo)
+        esGateway.setDatasetMeta(unanchoredCopyInfo)
       case ColumnCreated(info: UnanchoredColumnInfo) =>
-        createColumn(copyInfo, info)
+        createColumn(datasetId, copyId, info)
       case SnapshotDropped(info: UnanchoredCopyInfo) =>
         esGateway.deleteType()
       case ColumnRemoved(_) | WorkingCopyCreated(_, _) =>
@@ -124,22 +127,22 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
         // TODO:
         println(s"ignore: $otherOps")
     }}
-    esGateway.setDatasetMeta(copyInfo)
     cookie
   }
 
-  private def createCopy(copyInfo: CopyInfo) {
-    val esGateway = getESGateway(copyInfo)
+  private def createCopy(datasetInfo: DatasetInfoLike, copyInfo: CopyInfoLike) {
+    val esGateway = getESGateway(datasetInfo.systemId, copyInfo.copyNumber)
     esGateway.ensureIndex()
   }
 
-  private def createColumn(copyInfo: CopyInfo, columnInfo: UnanchoredColumnInfo) {
-    val esGateway = getESGateway(copyInfo)
+  private def createColumn(datasetId: DatasetId, copyId: Long, columnInfo: UnanchoredColumnInfo) {
+    val esGateway = getESGateway(datasetId, copyId)
     val esColumnsMap = Map(toESColumn(columnInfo))
     esGateway.updateEsColumnMapping(esColumnsMap)
+    createColumnIdMap(datasetId, Seq(columnInfo))
   }
 
-  private def upsert(schema: ColumnIdMap[ColumnInfo], esGateway: ESGateway, sid: RowId, data: Row[CV]) {
+  private def upsert(schema: ColumnIdMap[ColumnInfoLike], esGateway: ESGateway, sid: RowId, data: Row[CV]) {
     val row = rowConverter.toRow(schema, data)
     esGateway.addRow(row, sid.underlying)
   }
@@ -148,7 +151,7 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
     esGateway.deleteRow(sid.underlying)
   }
 
-  private def createSchema(esGateway: ESGateway, schema: ColumnIdMap[ColumnInfo]) {
+  private def createSchema(datasetId: DatasetId, esGateway: ESGateway, schema: ColumnIdMap[ColumnInfo]) {
     val esColumnsMap = schema.foldLeft(Map.empty[String, ESColumnMap]) { (map, colIdColInfo) =>
       colIdColInfo match {
         case (colId, colInfo) =>
@@ -159,10 +162,12 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
     esGateway.ensureIndex()
     esGateway.deleteType()
     esGateway.updateEsColumnMapping(esColumnsMap)
+    createColumnIdMap(datasetId, schema.values.toSeq)
   }
 
-  private def getESGateway(copyInfo: CopyInfo): ESGateway =
+  private def getESGateway(copyInfo: CopyInfo): ESGateway = {
     getESGateway(copyInfo.datasetInfo.systemId, copyInfo.copyNumber)
+  }
 
   private def getESGateway(datasetId: DatasetId, copyId: Long = 0): ESGateway =
     new ESHttpGateway(datasetId,  copyId, esBaseUrl = esBaseUrl)
@@ -170,21 +175,9 @@ class ESSecondary[CV: Converter](config: Config, conn: Option[Connection]) exten
 
 object ESSecondary {
 
-  implicit def datasetIdToESIndex(datasetId: DatasetId): ESIndex = ESIndex(s"ds${datasetId.underlying}")
-
-  implicit def copyIdToIndexType(version: CopyId): ESType = versionToIndexType(version.underlying)
-
-  implicit def versionToIndexType(version: Long): ESType = ESType(s"v${version}")
-
   implicit def copyInfoToDatasetMeta(copyInfo: CopyInfo): DatasetMeta = DatasetMeta(copyInfo.copyNumber, copyInfo.dataVersion)
 
-  private def schemaFromPg(conn: Connection, secondary: Secondary[_], datasetId: DatasetId) = {
-    val datasetMapReader = new PostgresDatasetMapReader(conn)
-    val datasetInfo: DatasetInfo = datasetMapReader.datasetInfo(datasetId).get
-    val copyInfo = datasetMapReader.copyNumber(datasetInfo, secondary.currentCopyNumber(datasetInfo.systemId, None)).get
-    (copyInfo, datasetMapReader.schema(copyInfo))
-  }
-
+  implicit def unanchoredCopyInfoToDatasetMeta(copyInfo: UnanchoredCopyInfo): DatasetMeta = DatasetMeta(copyInfo.copyNumber, copyInfo.dataVersion)
 
   private def toESColumn(colInfo: UnanchoredColumnInfo) = {
     (colInfo.physicalColumnBaseBase -> ESColumnMap(SoQLTypeContext.typeFromName(colInfo.typeName)))
@@ -201,7 +194,7 @@ object ESSecondary {
           println( s"copyDataVersion: ${copyInfo.dataVersion}")
           println( s"copyNumber: ${copyInfo.copyNumber}")
 
-          val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any](ConfigFactory.empty, Some(conn))
+          val secondary: ESSecondary[Any] = new com.socrata.es.store.ESSecondary[Any](ConfigFactory.empty)
           val delogger: Delogger[Any] = new SqlDelogger(conn, datasetInfo.logTableName, () => SoQLRowLogCodec)
 
           using(delogger.delog(copyInfo.dataVersion)) { logEventIter =>

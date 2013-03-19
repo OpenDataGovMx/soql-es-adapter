@@ -11,7 +11,7 @@ import com.rojoma.json.util.JsonUtil
 import com.socrata.json.codec.elasticsearch.DatasetContextCodec
 import java.io.InputStream
 import com.socrata.soql.environment.DatasetContext
-import com.socrata.es.meta.{DatasetMeta, ESType, ESIndex}
+import com.socrata.es.meta.{ESColumnName, DatasetMeta, ESType, ESIndex}
 import com.socrata.es.exception._
 import com.rojoma.json.io.JsonReader
 
@@ -29,7 +29,7 @@ trait ESGateway {
 
   def getRows(limit: Int, offset: Long): String
 
-  def updateEsColumnMapping(cols: Map[String, ESColumnMap])
+  def updateEsColumnMapping(cols: Map[ESColumnName, ESColumnMap])
 
   def getDataContext(): DatasetContext[SoQLType]
 
@@ -122,8 +122,8 @@ class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),
     getResponse(Client.preparePost(url).setBody(query)).getResponseBodyAsStream
   }
 
-  def updateEsColumnMapping(cols: Map[String, ESColumnMap]) {
-    val propMap = cols.map { case (k, v) => k -> v.propMap }
+  def updateEsColumnMapping(cols: Map[ESColumnName, ESColumnMap]) {
+    val propMap = cols.map { case (k, v) => k.toString -> v.propMap }
     val jProperties = JObject(Map("properties" -> JObject(propMap)))
     val jBody = JObject(Map(esIndex.raw -> jProperties))
     execute(Client.preparePost("%1$s/_mapping".format(esDsUrl)).setBody(jBody.toString))

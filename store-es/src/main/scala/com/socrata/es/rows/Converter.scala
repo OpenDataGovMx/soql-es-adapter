@@ -7,6 +7,7 @@ import com.socrata.datacoordinator.common.soql.SoQLTypeContext
 import com.socrata.datacoordinator.Row
 import com.rojoma.json.ast.JNumber
 import com.socrata.datacoordinator.id.RowId
+import com.socrata.es.store.ESScheme._
 
 trait Converter[CV] {
   def toRow(schema: ColumnIdMap[ColumnInfoLike], row: Row[CV]): Map[String, Any]
@@ -24,7 +25,7 @@ object Converter {
       row.foldLeft(Map.empty[String, Any]) { (acc, x) =>
         x match {
           case (colId, cell) =>
-            acc + (schema(colId).physicalColumnBaseBase -> esColumnMap(colId).toES(cell))
+            acc + (toESColumnName(schema(colId)).toString -> esColumnMap(colId).toES(cell))
         }
       }
     }

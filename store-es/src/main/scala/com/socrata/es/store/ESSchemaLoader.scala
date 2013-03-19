@@ -1,6 +1,6 @@
 package com.socrata.es.store
 
-import com.socrata.rows.{ESHttpGateway, ESGateway}
+import com.socrata.rows.{ESColumnMap, ESHttpGateway, ESGateway}
 import com.socrata.soql.types.{SoQLText, SoQLType, SoQLNumber}
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
 import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
@@ -12,7 +12,7 @@ import com.rojoma.json.codec.JsonCodec._
 import com.socrata.datacoordinator.util.collection.ColumnIdMap
 import com.socrata.datacoordinator.truth.metadata.{UnanchoredColumnInfo, ColumnInfoLike}
 import com.socrata.datacoordinator.id.{CopyId, DatasetId, RowId, ColumnId}
-import com.socrata.es.meta.{ESType, ESIndex}
+import com.socrata.es.meta.{ESColumnName, ESType, ESIndex}
 import com.socrata.soql.collection.OrderedMap
 import com.typesafe.config.Config
 
@@ -34,10 +34,9 @@ trait ESSchemaLoader {
     val esColGateway = getColumnGateway(datasetId)
     columnInfos.foreach { ci =>
       val columnInfo = Map(
-        "name" -> JString(ci.physicalColumnBaseBase),
+        "name" -> JString(toESColumnName(ci).toString),
         "id" -> JNumber(ci.systemId.underlying),
-        "type" -> JString(ci.typeName),
-        ci.physicalColumnBaseBase -> ci.systemId.underlying)
+        "type" -> JString(ci.typeName))
       esColGateway.addRow(columnInfo, ci.systemId.underlying)
     }
     esColGateway.flush()
@@ -88,4 +87,14 @@ object ESScheme {
   implicit def copyIdToIndexType(version: CopyId): ESType = versionToIndexType(version.underlying)
 
   implicit def versionToIndexType(version: Long): ESType = ESType(s"v${version}")
+
+  def toESColumnName(columnName: ESColumnName): ESColumnName = columnName
+
+  implicit def columnInfoLikeToESColumn(ci: ColumnInfoLike): ESColumnName = {
+    val pcbb = ci.physicalColumnBaseBase
+    val name =
+      if (pcbb.startsWith("s_")) pcbb.replace("s_", ":")
+      else pcbb.replace("u_", "")
+    ESColumnName(name)
+  }
 }

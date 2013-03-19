@@ -16,21 +16,20 @@ import com.socrata.datacoordinator.truth.loader.sql.SqlDelogger
 import com.socrata.datacoordinator.truth.metadata.sql.PostgresDatasetMapReader
 import com.socrata.datacoordinator.truth._
 import com.socrata.datacoordinator.truth.loader._
-import com.socrata.es.meta.DatasetMeta
+import com.socrata.es.meta.{ESColumnName, DatasetMeta, ESIndex, ESType}
 import com.rojoma.simplearm._
-import com.socrata.es.meta.{ESIndex, ESType}
 import java.sql.Connection
 import com.typesafe.config.{ConfigFactory, Config}
 import java.io.InputStream
 import com.socrata.soql.adapter.elasticsearch.ESResultSet
-
+import ESScheme._
 
 class ESSecondaryAny(config: Config) extends ESSecondary[Any](config)
 
 class ESSecondary[CV: Converter](val config: Config) extends Secondary[CV] with ESSchemaLoader {
 
   import ESSecondary._
-  import ESScheme._
+
 
   private val rowConverter = implicitly[Converter[CV]]
 
@@ -152,11 +151,11 @@ class ESSecondary[CV: Converter](val config: Config) extends Secondary[CV] with 
   }
 
   private def createSchema(datasetId: DatasetId, esGateway: ESGateway, schema: ColumnIdMap[ColumnInfo]) {
-    val esColumnsMap = schema.foldLeft(Map.empty[String, ESColumnMap]) { (map, colIdColInfo) =>
+
+    val esColumnsMap = schema.foldLeft(Map.empty[ESColumnName, ESColumnMap]) { (map, colIdColInfo) =>
       colIdColInfo match {
         case (colId, colInfo) =>
-          val colName = colInfo.physicalColumnBaseBase
-          map + (colName -> ESColumnMap(SoQLTypeContext.typeFromName(colInfo.typeName)))
+          map + (toESColumnName(colInfo) -> ESColumnMap(SoQLTypeContext.typeFromName(colInfo.typeName)))
       }
     }
     esGateway.ensureIndex()
@@ -179,8 +178,9 @@ object ESSecondary {
 
   implicit def unanchoredCopyInfoToDatasetMeta(copyInfo: UnanchoredCopyInfo): DatasetMeta = DatasetMeta(copyInfo.copyNumber, copyInfo.dataVersion)
 
+
   private def toESColumn(colInfo: UnanchoredColumnInfo) = {
-    (colInfo.physicalColumnBaseBase -> ESColumnMap(SoQLTypeContext.typeFromName(colInfo.typeName)))
+    (toESColumnName(colInfo) -> ESColumnMap(SoQLTypeContext.typeFromName(colInfo.typeName)))
   }
 
   def shipToSecondary(datasetName: String, conn: Connection) {

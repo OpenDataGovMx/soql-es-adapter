@@ -7,3 +7,8 @@ case class ESIndex(val raw: String) {
 case class ESType(val raw: String) {
   override def toString = raw
 }
+
+case class ESColumnName(val raw: String) {
+  override def toString = raw
+}
+

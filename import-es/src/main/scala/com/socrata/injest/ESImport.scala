@@ -7,7 +7,7 @@ import com.socrata.rows.{ESColumnMap, ESHttpGateway}
 import com.socrata.util.strings.CamelCase
 import java.util.zip.GZIPInputStream
 import com.rojoma.json.ast.JNull
-import com.socrata.es.meta.ESIndex
+import com.socrata.es.meta.{ESColumnName, ESIndex}
 
 object ESImport {
 
@@ -31,7 +31,7 @@ object ESImport {
 
       esGateway.ensureIndex()
       if (addColumnMap) {
-        esGateway.updateEsColumnMapping(headerName.zip(esColumnMap).toMap)
+        esGateway.updateEsColumnMapping(headerName.map(ESColumnName).zip(esColumnMap).toMap)
       }
 
       var rawData: Array[String] = csv.readNext()

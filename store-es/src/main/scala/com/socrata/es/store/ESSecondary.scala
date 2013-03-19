@@ -27,7 +27,7 @@ import com.socrata.soql.adapter.elasticsearch.ESResultSet
 
 class ESSecondaryAny(config: Config) extends ESSecondary[Any](config)
 
-class ESSecondary[CV: Converter](config: Config) extends Secondary[CV] with ESSchemaLoader {
+class ESSecondary[CV: Converter](val config: Config) extends Secondary[CV] with ESSchemaLoader {
 
   import ESSecondary._
   import ESScheme._

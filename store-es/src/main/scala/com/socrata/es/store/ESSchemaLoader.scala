@@ -14,6 +14,7 @@ import com.socrata.datacoordinator.truth.metadata.{UnanchoredColumnInfo, ColumnI
 import com.socrata.datacoordinator.id.{CopyId, DatasetId, RowId, ColumnId}
 import com.socrata.es.meta.{ESType, ESIndex}
 import com.socrata.soql.collection.OrderedMap
+import com.typesafe.config.Config
 
 
 /**
@@ -26,6 +27,8 @@ import com.socrata.soql.collection.OrderedMap
 trait ESSchemaLoader {
 
   import ESScheme._
+
+  val config: Config
 
   def createColumnIdMap(datasetId: DatasetId, columnInfos: Seq[ColumnInfoLike]) {
     val esColGateway = getColumnGateway(datasetId)
@@ -74,7 +77,7 @@ trait ESSchemaLoader {
   }
 
   private def getColumnGateway(datasetId: DatasetId): ESGateway =
-    new ESHttpGateway(datasetId,  ESType("column"))
+    new ESHttpGateway(datasetId,  ESType("column"), esBaseUrl = config.getString("url"))
 }
 
 

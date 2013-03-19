@@ -159,6 +159,7 @@ class ESSecondary[CV: Converter](val config: Config) extends Secondary[CV] with 
       }
     }
     esGateway.ensureIndex()
+    deleteColumnIdMap(datasetId)
     esGateway.deleteType()
     esGateway.updateEsColumnMapping(esColumnsMap)
     createColumnIdMap(datasetId, schema.values.toSeq)

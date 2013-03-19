@@ -63,6 +63,11 @@ trait ESSchemaLoader {
     ColumnIdMap(schema)
   }
 
+  def deleteColumnIdMap(datasetId: DatasetId) {
+    val gw = getColumnGateway(datasetId)
+    gw.deleteType()
+  }
+
   private def schemaDataContext(esGateway: ESGateway): DatasetContext[SoQLType] = {
     new DatasetContext[SoQLType] {
       implicit val ctx = this

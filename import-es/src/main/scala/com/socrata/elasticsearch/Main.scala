@@ -60,12 +60,19 @@ object Main extends App {
     // switch datasetName version
     val switchDatasetCmd = """switch\s+(.+)\s+(.+)""".r
     val limitCmd = """limit\s+(.+)""".r
+    var lastCmd = "map"
 
     while(true) {
-      val cmd = readLine("soql %s>".format(resource.get))
+      val line = readLine("soql %s>".format(resource.get))
       try {
+        val cmd =
+          if (line == "") {
+            println(lastCmd)
+            lastCmd
+          }
+          else line
         cmd match {
-          case "" => println("%s on %s".format(resource.get, es))
+          case "info" => println("%s on %s".format(resource.get, es))
           case "exit" | "quit" | "e" | "q" => return
           case "map" =>
             val ctx = esGateway.getDataContext()
@@ -88,6 +95,7 @@ object Main extends App {
                 println(rowStream.mkString("[", ",\n", "]"))
               }
         }
+        lastCmd = cmd
       } catch {
         case e: SoQLException => println(e.getMessage)
         case e: SoQLAdapterException => println(e.getMessage)

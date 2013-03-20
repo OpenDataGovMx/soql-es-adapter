@@ -617,6 +617,48 @@ class ESQueryTest extends FunSuite with MustMatchers {
         }
       """))
   }
+
+  test("single group single order") {
+    toEsQuery("select primary_type, count(id) group by primary_type order by primary_type desc") must equal(json(
+      """
+        {
+          "facets" :
+            {
+              "fc:primary_type:id" :
+                {
+                  "terms_stats" :
+                    {
+                      "key_field" : "primary_type",
+                      "value_field" : "id",
+                      "order" : "reverse_term",
+                      "size" : 0
+                    }
+                }
+            },
+          "size" : 0
+        }
+      """))
+
+    toEsQuery("select primary_type, avg(id) group by primary_type order by avg(id)") must equal(json(
+      """
+        {
+          "facets" :
+            {
+              "fc:primary_type:id" :
+                {
+                  "terms_stats" :
+                    {
+                      "key_field" : "primary_type",
+                      "value_field" : "id",
+                      "order" : "mean",
+                      "size" : 0
+                    }
+                }
+            },
+          "size" : 0
+        }
+      """))
+  }
 }
 
 object ESQueryTest {

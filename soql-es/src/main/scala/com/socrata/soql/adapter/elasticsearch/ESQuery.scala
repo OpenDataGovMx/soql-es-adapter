@@ -126,11 +126,12 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
                           offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
     if (groupBys.size > 1) toESGroupByColumns(groupBys, orderBys, cols, offset, limit)
-    else toESGroupByTermsStats(groupBys, cols, offset, limit)
+    else toESGroupByTermsStats(groupBys, orderBys, cols, offset, limit)
   }
 
-  private def toESGroupByTermsStats(groupBys: Seq[CoreExpr[SoQLType]], cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
-                          offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
+  private def toESGroupByTermsStats(groupBys: Seq[CoreExpr[SoQLType]], orderBys: Option[Seq[OrderBy[SoQLType]]],
+                                    cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
+                                    offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
     val esGroupBys = groupBys.collect { // ignore expression that aren't simple column
       case col: ColumnRef[_] =>
@@ -166,7 +167,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
             else limit.get + offset.get
           val facetKeyVal = JObject(Map(
             "key_field" -> JString(col.column.name), facetVal._1 -> facetVal._2,
-            "order" -> JString("term"), // TODO - allow different orderings
+            "order" -> termsStatsOrderBy(orderBys),
             "size" -> JNumber(size)
           ))
           val termsStats = JObject(Map("terms_stats" -> facetKeyVal))
@@ -177,6 +178,30 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     }
     if (esGroupBys.size > 1) throw new NotImplementedException("Cannot handle multiple groups", groupBys(1).position)
     esGroupBys.head
+  }
+
+  private def termsStatsOrderBy(orderBys: Option[Seq[OrderBy[SoQLType]]]): JString = {
+
+    def ascend(asc: Boolean) = if (asc) "" else "reverse_"
+
+    val obs = orderBys.map { obs =>
+      obs.collect {
+        case OrderBy(ColumnRef(column, typ), asc, nullLast) =>
+          s"${ascend(asc)}term"
+        case OrderBy(FunctionCall(MonomorphicFunction(function, _), ColumnRef(column, typ) :: Nil), asc, nullLast) if AggregateFunctions.contains(function) =>
+          s"${ascend(asc)}${AggregateFunctionTermsStatsMap(function.name)}"
+        case u => throw new NotImplementedException(s"ordered by $u", u.expression.position)
+      }
+    }
+
+    obs match {
+      case None => JString("term")
+      case Some(h :: Nil) => JString(h)
+      case Some(h :: t) =>
+        // TODO: Consider ditching termsStats facet in favor of column facet or scripted facet
+        throw new NotImplementedException(s"can only handle one order by expression when there is one group by",
+          orderBys.get.head.expression.position)
+    }
   }
 
   private def toESGroupByColumns(groupBys: Seq[CoreExpr[SoQLType]],
@@ -250,4 +275,11 @@ object ESQuery {
 
   val AggregateFunctions: Set[com.socrata.soql.functions.Function[SoQLType]] =
     Set(SoQLFunctions.Max, SoQLFunctions.Min, SoQLFunctions.Count, SoQLFunctions.Sum, SoQLFunctions.Avg)
+
+  private val AggregateFunctionTermsStatsMap = Map(
+    SoQLFunctions.Count.name -> "count",
+    SoQLFunctions.Sum.name -> "total",
+    SoQLFunctions.Min.name -> "min",
+    SoQLFunctions.Max.name -> "max",
+    SoQLFunctions.Avg.name -> "mean")
 }

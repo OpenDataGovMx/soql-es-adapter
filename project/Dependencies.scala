@@ -46,4 +46,6 @@ object Dependencies {
   val coordinatorlib = "com.socrata" %% "coordinatorlib" % versions.dataCoordinator % "provided"
 
   val coordinatorlibSoql = "com.socrata" %% "coordinatorlib-soql" % versions.dataCoordinator % "provided"
+
+  val slf4j = "org.slf4j" % "slf4j-simple"
 }

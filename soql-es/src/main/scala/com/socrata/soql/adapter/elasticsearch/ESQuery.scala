@@ -267,6 +267,8 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
 
 object ESQuery {
 
+  val log = org.slf4j.LoggerFactory.getLogger(classOf[ESQuery])
+
   private val JObject0 = JObject(Map.empty)
 
   def JObject1(k: String, v: JValue): JObject = JObject(Map(k -> v))
@@ -282,4 +284,14 @@ object ESQuery {
     SoQLFunctions.Min.name -> "min",
     SoQLFunctions.Max.name -> "max",
     SoQLFunctions.Avg.name -> "mean")
+
+  private def checkKnownAggregateFuns {
+    val KnownAggregateFuns = SoQLFunctions.allFunctions.filter(_.isAggregate)
+    KnownAggregateFuns.foreach { f =>
+      if (!(AggregateFunctions.contains(f) && AggregateFunctionTermsStatsMap.isDefinedAt(f.name)))
+        log.warn(s"aggregate function ${f} is not implemented.")
+    }
+  }
+
+  checkKnownAggregateFuns
 }

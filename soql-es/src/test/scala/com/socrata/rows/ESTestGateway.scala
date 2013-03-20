@@ -5,7 +5,7 @@ import java.{lang => jl}
 import com.socrata.soql.types._
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
 import com.socrata.soql.collection.OrderedMap
-import com.socrata.es.meta.DatasetMeta
+import com.socrata.es.meta.{ESColumnName, DatasetMeta}
 import java.io.InputStream
 
 class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) extends ESGateway {
@@ -36,7 +36,7 @@ class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) ext
 
   def deleteType() { throw new UnsupportedOperationException }
 
-  def updateEsColumnMapping(cols: Map[String, ESColumnMap]) {
+  def updateEsColumnMapping(cols: Map[ESColumnName, ESColumnMap]) {
     throw new UnsupportedOperationException
   }
 

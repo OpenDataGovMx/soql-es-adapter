@@ -9,7 +9,7 @@ class FacetName(val groupKey: String, val groupValue: String) {
 
 object FacetName {
 
-  private val rx = """fc:(.+):(.+)""".r
+  private val rx = """fc:(:?[^:]+):(:?[^:]+)""".r // allow column to start with : for handling system column names.
 
   def apply(k: String, v: String) = new FacetName(k, v)
 

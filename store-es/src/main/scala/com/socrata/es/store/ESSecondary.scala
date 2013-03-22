@@ -95,7 +95,7 @@ class ESSecondary[CV: Converter](val config: Config) extends Secondary[CV] with 
 
   def version(datasetId: DatasetId, dataVersion: Long, cookie: Cookie, events: Iterator[Delogger.LogEvent[CV]]): Cookie = {
 
-    // TODO: consider validating schema or getting schema from Elasticsearch
+    validateVersionConsistency(datasetId, dataVersion, cookie)
     val copyId = currentCopyNumber(datasetId, cookie)
     val esGateway = getESGateway(datasetId, copyId)
     val schema = loadColumnIdNameMap(datasetId, esGateway)
@@ -127,6 +127,11 @@ class ESSecondary[CV: Converter](val config: Config) extends Secondary[CV] with 
         println(s"ignore: $otherOps")
     }}
     cookie
+  }
+
+  private def validateVersionConsistency(datasetId: DatasetId, dataVersion: Long, cookie: Cookie) {
+    if (dataVersion - currentVersion(datasetId, cookie) != 1)
+      throw new Exception("out of sync, need resync.") // TODO: Exception to be defined
   }
 
   private def createCopy(datasetInfo: DatasetInfoLike, copyInfo: CopyInfoLike) {

@@ -1,5 +1,6 @@
 package com.socrata.soql.adapter.elasticsearch
 
+import com.socrata.es.facet.Facet
 import com.socrata.soql.typed._
 import com.rojoma.json.ast._
 import com.socrata.soql.adapter.{XlateCtx, NotImplementedException, SoqlAdapter}
@@ -13,6 +14,7 @@ import com.rojoma.json.ast.JArray
 import com.socrata.soql.functions.{SoQLFunctions, SoQLTypeInfo, SoQLFunctionInfo, MonomorphicFunction}
 import com.socrata.soql.parsing.SoQLPosition
 import com.rojoma.json.ast.JString
+import com.socrata.es.facet.{ColumnsFacet, TermsStatsFacet, ColumnsFacetType, TermsStatsFacetType}
 
 class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Option[BigInt] = Some(1000),
               context: Option[DatasetContext[SoQLType]] = None) extends SoqlAdapter[String] {
@@ -51,7 +53,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     // Must wrap in a query in order to affect facets.
     // filtered query must have query but we don't use it because it cannot handle and/or.
     // We fool it be puting match_all there.
-      if (analysis.groupBy.isDefined) JObject(Map("filtered"-> JObject(OrderedMap("query" -> JObject1("match_all", JObject0), "filter" -> filter))))
+      if (analysis.isGrouped) JObject(Map("filtered"-> JObject(OrderedMap("query" -> JObject1("match_all", JObject0), "filter" -> filter))))
       else filter
     }
 
@@ -64,11 +66,16 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
       if (analysis.isGrouped) None
       else analysis.orderBy.map(toESOrderBy)
 
+    val esGroup =
+      if (analysis.isGrouped) Some(toESGroupBy(analysis.groupBy.getOrElse(Seq.empty[CoreExpr[SoQLType]]),
+        analysis.orderBy, analysis.selection, analysis.offset, analysis.limit))
+      else None
+
     val esObjectPropsSomeValuesMayBeEmpty =
       OrderedMap(
-        (if (analysis.groupBy.isDefined) "query" else "filter") -> esFilterOrQuery,
+        (if (analysis.isGrouped) "query" else "filter") -> esFilterOrQuery,
         "sort" -> esOrder,
-        "facets" -> analysis.groupBy.map(toESGroupBy(_, analysis.orderBy, analysis.selection, analysis.offset, analysis.limit)),
+        "facets" -> esGroup,
         "from" -> analysis.offset.map(toESOffset),
         "size" -> esLimit
       )
@@ -125,139 +132,30 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
                           cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
                           offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
-    if (groupBys.size > 1) toESGroupByColumns(groupBys, orderBys, cols, offset, limit)
-    else toESGroupByTermsStats(groupBys, orderBys, cols, offset, limit)
-  }
-
-  private def toESGroupByTermsStats(groupBys: Seq[CoreExpr[SoQLType]], orderBys: Option[Seq[OrderBy[SoQLType]]],
-                                    cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
-                                    offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
-
-    val esGroupBys = groupBys.collect { // ignore expression that aren't simple column
-      case col: ColumnRef[_] =>
-        val aggregateColumns = cols.foldLeft(OrderedSet.empty[ColumnRef[_]]) { (aggregateCols, outputCol) => outputCol match {
-          case (columnName, expr) =>
-            expr match {
-              case FunctionCall(function, (arg : ColumnRef[_]) :: Nil) if function.isAggregate =>
-                // ColumnRef contains position info which prevents us from directly using ColumnRef equal.
-                if (aggregateCols.find(_.column == arg.column).isDefined) aggregateCols
-                else aggregateCols + arg
-              case FunctionCall(function, arg) if function.isAggregate =>
-                // require facet script value
-                throw new NotImplementedException("Aggregate on expression not implemented", expr.position)
-              case _ =>
-                // should never happen
-                aggregateCols
-            }
-        }}
-
-        JObject(aggregateColumns.map { aggregateValue =>
-          val facetVal = aggregateValue.typ match {
-            case SoQLNumber =>
-              ("value_field", JString(aggregateValue.column.name))
-            case _ =>
-              // terms stat only works on numeric fields.  Use value script to at least get sensible result for count(text)
-              ("value_script", JString("doc[%s].empty ? 0 : 1".format(JString(aggregateValue.column.name))))
-          }
-          // Make some sense out of optional offset, limit and default limit.
-          val size: BigInt =
-            if (limit.isEmpty && offset.isEmpty) defaultLimit.getOrElse(0)
-            else if (limit.isDefined && offset.isEmpty) limit.get
-            else if (offset.isDefined && limit.isEmpty) offset.get + defaultLimit.getOrElse(1)
-            else limit.get + offset.get
-          val facetKeyVal = JObject(Map(
-            "key_field" -> JString(col.column.name), facetVal._1 -> facetVal._2,
-            "order" -> termsStatsOrderBy(orderBys),
-            "size" -> JNumber(size)
-          ))
-          val termsStats = JObject(Map("terms_stats" -> facetKeyVal))
-          val facetName = FacetName(col.column.name, aggregateValue.column.name)
-          val facet = (facetName.toString(), termsStats)
-          facet
-        }.toMap)
-    }
-    if (esGroupBys.size > 1) throw new NotImplementedException("Cannot handle multiple groups", groupBys(1).position)
-    esGroupBys.head
-  }
-
-  private def termsStatsOrderBy(orderBys: Option[Seq[OrderBy[SoQLType]]]): JString = {
-
-    def ascend(asc: Boolean) = if (asc) "" else "reverse_"
-
-    val obs = orderBys.map { obs =>
-      obs.collect {
-        case OrderBy(ColumnRef(column, typ), asc, nullLast) =>
-          s"${ascend(asc)}term"
-        case OrderBy(FunctionCall(MonomorphicFunction(function, _), ColumnRef(column, typ) :: Nil), asc, nullLast) if AggregateFunctions.contains(function) =>
-          s"${ascend(asc)}${AggregateFunctionTermsStatsMap(function.name)}"
-        case u => throw new NotImplementedException(s"ordered by $u", u.expression.position)
-      }
-    }
-
-    obs match {
-      case None => JString("term")
-      case Some(h :: Nil) => JString(h)
-      case Some(h :: t) =>
-        // TODO: Consider ditching termsStats facet in favor of column facet or scripted facet
-        throw new NotImplementedException(s"can only handle one order by expression when there is one group by",
-          orderBys.get.head.expression.position)
+    val lim = if (limit.isDefined) limit else defaultLimit
+    groupBys.size match {
+      case 1 =>
+        val facet = TermsStatsFacet(groupBys, orderBys, cols, offset, lim)
+        facet.toJObject
+      case 0 => // implied grouping like select count(x)
+        toImpliedGroupFacet(cols, orderBys, offset, lim)
+      case n =>
+        val facet = ColumnsFacet(groupBys, orderBys, cols, offset, lim)
+        facet.toJObject
     }
   }
 
-  private def toESGroupByColumns(groupBys: Seq[CoreExpr[SoQLType]],
-                          orderBys: Option[Seq[OrderBy[SoQLType]]],
-                          cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
-                          offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
+  private def toImpliedGroupFacet(cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
+                            orderBys: Option[Seq[OrderBy[SoQLType]]],
+                            offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
-    val keys = JArray(groupBys.collect { // ignore expression that aren't simple column
-      case col: ColumnRef[_] => JString(col.column.name)
-    })
+    val esGroupBys = cols.collect {
+      case (columnName, aggExpr) =>
+        Facet(columnName, aggExpr).toJObject
+    }
 
-    val aggregateColumns = cols.foldLeft(OrderedSet.empty[ColumnRef[_]]) { (aggregateCols, outputCol) => outputCol match {
-      case (columnName, expr) =>
-        expr match {
-          case FunctionCall(function, (arg : ColumnRef[_]) :: Nil) if function.isAggregate =>
-            // ColumnRef contains position info which prevents us from directly using ColumnRef equal.
-            if (aggregateCols.find(_.column == arg.column).isDefined) aggregateCols
-            else aggregateCols + arg
-          case FunctionCall(function, arg) if function.isAggregate =>
-            // require facet script value
-            throw new NotImplementedException("Aggregate on expression not implemented", expr.position)
-          case _ =>
-            // should never happen
-            aggregateCols
-        }
-    }}
-
-    JObject(aggregateColumns.map { aggregateValue =>
-        val facetVal = ("value_field", JString(aggregateValue.column.name))
-
-        val orders = orderBys.map { obs =>
-            obs.collect {
-              case OrderBy(ColumnRef(column, typ), asc, nullLast) =>
-                JString("%s%s".format(column.name, (if (asc) "" else " desc")))
-              case OrderBy(FunctionCall(MonomorphicFunction(function, _), ColumnRef(column, typ) :: Nil), asc, nullLast) if
-              (AggregateFunctions.contains(function)) && column.name == aggregateValue.column.name =>
-                JString(":%s%s".format(function.name.name, (if (asc) "" else " desc")))
-            }
-        }
-
-        val facetMap = OrderedMap( // ES columns facet needs orders to be specified after keys.  Therefore, we use ordered map.
-          "key_fields" -> keys,
-          facetVal._1 -> facetVal._2,
-          "size" -> JNumber(limit.getOrElse(defaultLimit.getOrElse(BigInt(10)))),
-          "from" -> JNumber(offset.getOrElse(BigInt(0)))
-        )
-        val facetWithSortMap = orders match {
-          case Some(obs) => facetMap + ("orders" -> JArray(obs))
-          case None => facetMap
-        }
-        val facetKeyVal = JObject(facetWithSortMap)
-        val termsStats = JObject(Map("columns" -> facetKeyVal))
-        val facetName = FacetName("_multi", aggregateValue.column.name)
-        val facet = (facetName.toString(), termsStats)
-        facet
-      }.toMap)
+    // Merge everything into one row.  If there is a single gropu, we could have skipped the merge.
+    esGroupBys.fold(JObject(Map.empty))((jo1, jo2) => JObject(jo1.toMap ++ jo2.toMap))
   }
 
   private def toESFilter(filter: CoreExpr[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
@@ -278,7 +176,7 @@ object ESQuery {
   val AggregateFunctions: Set[com.socrata.soql.functions.Function[SoQLType]] =
     Set(SoQLFunctions.Max, SoQLFunctions.Min, SoQLFunctions.Count, SoQLFunctions.Sum, SoQLFunctions.Avg)
 
-  private val AggregateFunctionTermsStatsMap = Map(
+  val AggregateFunctionTermsStatsMap = Map(
     SoQLFunctions.Count.name -> "count",
     SoQLFunctions.Sum.name -> "total",
     SoQLFunctions.Min.name -> "min",

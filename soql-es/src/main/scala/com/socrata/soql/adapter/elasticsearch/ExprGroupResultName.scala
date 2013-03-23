@@ -1,6 +1,8 @@
 package com.socrata.soql.adapter.elasticsearch
 
 import com.socrata.soql.typed.{CoreExpr, FunctionCall, ColumnRef}
+import com.socrata.soql.functions.SoQLFunctions
+import com.socrata.es.facet.StatisticalFacet
 
 /**
  * Convert expression to naming style we use in simple grouping queries
@@ -28,8 +30,14 @@ object ExprGroupResultName {
 
   implicit def funCallToGroupResultName(x: FunctionCall[_]) = new ExprGroupResultName[FunctionCall[_]] {
     def toName: String = {
-      val arg: String = exprToGroupResultName(x.parameters.head).toName
-      s"${x.function.name.name}_${arg}"
+
+      x.function.name match {
+        case SoQLFunctions.CountStar.name =>
+          s"${SoQLFunctions.Count.name.name}_${StatisticalFacet.CountStar}"
+        case _ =>
+          val arg: String = exprToGroupResultName(x.parameters.head).toName
+          s"${x.function.name.name}_${arg}"
+      }
     }
   }
 }

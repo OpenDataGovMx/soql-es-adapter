@@ -161,7 +161,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
             },
           "facets" :
             {
-              "fc:primary_type:id" :
+              "fcts:primary_type:id" :
                 {
                   "terms_stats" :
                     {
@@ -188,7 +188,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
             },
           "facets" :
             {
-              "fc:primary_type:case_number" :
+              "fcts:primary_type:case_number" :
                 {
                   "terms_stats" :
                     {
@@ -198,7 +198,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
                       "size" : 4
                     }
                 },
-              "fc:primary_type:id" :
+              "fcts:primary_type:id" :
                 {
                   "terms_stats" :
                     {
@@ -480,7 +480,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
         {
           "facets" :
             {
-              "fc:_multi:id" :
+              "fcc:_multi:id" :
                 {
                   "columns" :
                     {
@@ -501,7 +501,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
         {
           "facets" :
             {
-              "fc:_multi:id" :
+              "fcc:_multi:id" :
                 {
                   "columns" :
                     {
@@ -624,7 +624,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
         {
           "facets" :
             {
-              "fc:primary_type:id" :
+              "fcts:primary_type:id" :
                 {
                   "terms_stats" :
                     {
@@ -644,7 +644,7 @@ class ESQueryTest extends FunSuite with MustMatchers {
         {
           "facets" :
             {
-              "fc:primary_type:id" :
+              "fcts:primary_type:id" :
                 {
                   "terms_stats" :
                     {

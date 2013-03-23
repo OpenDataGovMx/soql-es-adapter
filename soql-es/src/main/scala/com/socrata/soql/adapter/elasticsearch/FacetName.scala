@@ -1,21 +1,25 @@
 package com.socrata.soql.adapter.elasticsearch
 
-class FacetName(val groupKey: String, val groupValue: String) {
+import com.socrata.es.facet.{ColumnsFacetType, StatisticalFacetType, StatisticalFacet, FacetType}
 
-  override def toString() = "fc:%s:%s".format(groupKey, groupValue)
+class FacetName(val facetType: FacetType, val groupKey: String, val groupValue: String) {
 
-  def isMultiColumn() = groupKey == "_multi"
+  override def toString() = "fc%s:%s:%s".format(facetType.name, groupKey, groupValue)
+
+  def isMultiColumn() = groupKey == ColumnsFacetType.groupKey
+
+  def isStatistical() = groupKey == StatisticalFacetType.groupKey
 }
 
 object FacetName {
 
-  private val rx = """fc:(:?[^:]+):(:?[^:]+)""".r // allow column to start with : for handling system column names.
+  private val rx = """fc([a-z]+):(:?[^:]+):(:?[^:]+)""".r // allow column to start with : for handling system column names.
 
-  def apply(k: String, v: String) = new FacetName(k, v)
+  def apply(t: FacetType, k: String, v: String) = new FacetName(t, k, v)
 
   def unapply(composedName: String): Option[FacetName] = {
     composedName match {
-      case rx(k, v) => Option(new FacetName(k, v))
+      case rx(t, k, v) => Option(new FacetName(FacetType(t), k, v))
       case _ => None
     }
   }

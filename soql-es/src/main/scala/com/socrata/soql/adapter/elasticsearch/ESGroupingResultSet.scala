@@ -9,6 +9,8 @@ import com.socrata.soql.collection.OrderedMap
 import com.rojoma.json.codec.JsonCodec
 import com.socrata.soql.SoQLAnalyzer
 import com.socrata.soql.types.SoQLType
+import com.socrata.soql.typed.CoreExpr
+import com.socrata.es.facet.response.FacetResponseParser
 
 class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream: InputStream, charset: Charset)
   extends ESPlainResultSet(analysis, inputStream, charset) {
@@ -19,12 +21,12 @@ class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream
 
   import ExprGroupResultName._
 
-  private val isMultiGroup: Boolean = analysis.groupBy.map(_.size > 1).getOrElse(false)
+  protected val isMultiGroup: Boolean = analysis.groupBy.map(_.size > 1).getOrElse(false)
 
-  private val groupIndexMap = {
-    val exprIndexs = analysis.groupBy.get.zipWithIndex
+  protected val groupIndexMap = {
+    val exprIndexs = analysis.groupBy.map(_.zipWithIndex).getOrElse(Seq.empty[Tuple2[CoreExpr[SoQLType], Int]])
     analysis.selection.map { case (colName, expr) =>
-        colName -> exprIndexs.find { (exprIdx) => exprIdx._1 == expr }.map { (exprIdx) => exprIdx._2 }
+      colName -> exprIndexs.find { (exprIdx) => exprIdx._1 == expr }.map { (exprIdx) => exprIdx._2 }
     }
   }
 
@@ -83,7 +85,7 @@ class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream
     }
   }
 
-  private def parseOneFacet(lexer: JsonEventIterator): Tuple2[Option[Long], OrderedMap[JValue, JObject]] = {
+  protected def parseOneFacet(lexer: JsonEventIterator): Tuple2[Option[Long], OrderedMap[JValue, JObject]] = {
 
     lexer.next() match {
       case o: StartOfObjectEvent =>
@@ -98,57 +100,19 @@ class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream
   }
 
   /**
-   * @param facetType can be columns for multi-columns and terms-stats for single column
-   * @return true if we found facet, false means we find facet content
+   * Wrap the tailrec version so that this can be override by sub-class
    */
-  @tailrec
-  private def parseTotalOptionFacetEntries(lexer: JsonEventIterator, facet: FacetName, facetType: String, total: Option[Long]):
+  protected def parseTotalOptionFacetEntries(lexer: JsonEventIterator, facetName: FacetName, facetType: String, total: Option[Long]):
     Tuple2[Option[Long], OrderedMap[JValue, JObject]] = {
 
-    // total is only available in columns facet, non-exist in terms-stats facet.
-    skipToField(lexer, Set("total", facetType)) match {
-      case Some("total") =>
-        val ttl = JsonCodec.fromJValue[Long](jsonReader.read())
-        parseTotalOptionFacetEntries(lexer, facet, facetType, ttl) // keep going
-      case Some(field) if field == facetType =>
-        lexer.next() match {
-          case sa: StartOfArrayEvent =>
-            val groupRow = facetToGroupRow(jsonReader, facet, facet.groupKey, facet.groupValue)
-            lexer.next() // consume }
-            (total, groupRow)
-          case unexpected =>
-            throw new ESJsonBadParse(lexer.head, StartOfArrayEvent())
-        }
-      case Some(_) => // ignore any fields other than "total" and facetType
-        lexer.dropNextDatum()
-        parseTotalOptionFacetEntries(lexer, facet, facetType, total)
-      case None =>
-        throw new ESJsonBadParse(lexer.head, StartOfArrayEvent())
-    }
+    val facetParser = FacetResponseParser(facetName)
+    facetParser.parseFacet(jsonReader, facetName, facetType, total)
   }
 
-  @tailrec
-  private def facetToGroupRow(reader: JsonReader, facetName: FacetName, groupCol: String, aggregateCol: String, acc: OrderedMap[JValue, JObject] = OrderedMap.empty): OrderedMap[JValue, JObject] = {
+  protected def facetToGroupRow(reader: JsonReader, facetName: FacetName, groupCol: String, aggregateCol: String, acc: OrderedMap[JValue, JObject] = OrderedMap.empty, total: Option[Long]): OrderedMap[JValue, JObject] = {
 
-    reader.lexer.head match {
-      case _: EndOfArrayEvent =>
-        reader.lexer.next() // consume ]
-        acc
-      case _ =>
-        reader.read() match {
-          case facet@JObject(fields) =>
-            val groupKey = facet(facetGroupKey(facetName)) // group key is
-            // term property is removed and re-added using group col.
-            // for the rest of the properties, we append aggregate col to the key.
-            val groupRow = (fields -- unwantedFields).map {
-              case (k, v) => (aggregateFnMap(k) + "_" + aggregateCol, v)
-            } + (groupCol -> groupKey)
-            val acc2 = acc + (groupKey -> JObject(groupRow))
-            facetToGroupRow(reader, facetName, groupCol, aggregateCol, acc2)
-          case _ =>
-            throw new ESJsonBadParse(reader.lexer.head, StartOfObjectEvent())
-        }
-    }
+    val facetParser = FacetResponseParser(facetName)
+    facetParser.parseEntries(reader, facetName, groupCol, aggregateCol, acc, total)
   }
 }
 
@@ -165,9 +129,9 @@ object ESGroupingResultSet {
     "count" -> "count"
   )
 
-  private def facetDataKey(facetName: FacetName) =
+  def facetDataKey(facetName: FacetName) =
     if (facetName.isMultiColumn) "entries" else "terms"
 
-  private def facetGroupKey(facetName: FacetName) =
+  def facetGroupKey(facetName: FacetName) =
     if (facetName.isMultiColumn) "keys" else "term"
 }

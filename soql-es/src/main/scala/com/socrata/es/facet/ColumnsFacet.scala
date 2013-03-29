@@ -2,7 +2,6 @@ package com.socrata.es.facet
 
 import com.rojoma.json.codec.JsonCodec
 import com.rojoma.json.ast._
-import com.socrata.soql.adapter.elasticsearch.{ESQuery, FacetName}
 import com.socrata.soql.typed._
 import com.socrata.soql.collection.{OrderedSet, OrderedMap}
 import com.socrata.soql.typed.ColumnRef
@@ -14,7 +13,8 @@ import com.socrata.soql.functions.MonomorphicFunction
 import com.rojoma.json.ast.JArray
 import com.socrata.soql.types.SoQLType
 import com.socrata.soql.environment.ColumnName
-import com.socrata.soql.adapter.NotImplementedException
+import com.socrata.es.soql.NotImplementedException
+import com.socrata.es.soql.query.{FacetName, ESQuery}
 
 object ColumnsFacet {
 

@@ -2,12 +2,10 @@ package com.socrata.es.store
 
 import com.rojoma.simplearm.util._
 import com.socrata.datacoordinator.util.collection.ColumnIdMap
-import com.socrata.es.exception._
 import com.socrata.es.rows.Converter
-import com.socrata.rows.{ESGateway, ESColumnMap, ESHttpGateway}
 import com.socrata.datacoordinator.truth.metadata._
 import com.socrata.datacoordinator.truth.loader.Delogger._
-import com.socrata.datacoordinator.id.{ColumnId, RowId, DatasetId, CopyId}
+import com.socrata.datacoordinator.id.{RowId, DatasetId}
 import com.socrata.datacoordinator.secondary.Secondary
 import com.socrata.datacoordinator.secondary.Secondary.Cookie
 import com.socrata.datacoordinator.Row
@@ -16,13 +14,17 @@ import com.socrata.datacoordinator.truth.loader.sql.SqlDelogger
 import com.socrata.datacoordinator.truth.metadata.sql.PostgresDatasetMapReader
 import com.socrata.datacoordinator.truth._
 import com.socrata.datacoordinator.truth.loader._
-import com.socrata.es.meta.{ESColumnName, DatasetMeta, ESIndex, ESType}
+import com.socrata.es.meta._
 import com.rojoma.simplearm._
 import java.sql.Connection
 import com.typesafe.config.{ConfigFactory, Config}
-import java.io.InputStream
-import com.socrata.soql.adapter.elasticsearch.ESResultSet
 import ESScheme._
+import com.socrata.es.gateway.{ESHttpGateway, ESGateway}
+import loader.{Delete, Insert, Update}
+import metadata.{ColumnInfo, CopyInfo}
+import com.socrata.es.meta.ESColumnName
+import com.socrata.es.exception.GatewayNotFound
+import com.socrata.datacoordinator.util.NoopTimingReport
 
 class ESSecondaryAny(config: Config) extends ESSecondary[Any](config)
 
@@ -190,7 +192,7 @@ object ESSecondary {
   }
 
   def shipToSecondary(datasetName: String, conn: Connection) {
-    val datasetMapReader = new PostgresDatasetMapReader(conn)
+    val datasetMapReader = new PostgresDatasetMapReader(conn, NoopTimingReport)
 
     for (datasetId <- datasetMapReader.datasetId(datasetName)) {
       datasetMapReader.datasetInfo(datasetId) match {

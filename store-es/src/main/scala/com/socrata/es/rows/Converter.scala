@@ -1,13 +1,13 @@
 package com.socrata.es.rows
 
 import com.socrata.datacoordinator.util.collection.ColumnIdMap
-import com.socrata.rows.ESColumnMap
 import com.socrata.datacoordinator.truth.metadata.ColumnInfoLike
 import com.socrata.datacoordinator.common.soql.SoQLTypeContext
 import com.socrata.datacoordinator.Row
 import com.rojoma.json.ast.JNumber
 import com.socrata.datacoordinator.id.RowId
 import com.socrata.es.store.ESScheme._
+import com.socrata.es.meta.ESColumnMap
 
 trait Converter[CV] {
   def toRow(schema: ColumnIdMap[ColumnInfoLike], row: Row[CV]): Map[String, Any]

@@ -3,11 +3,11 @@ package com.socrata.injest
 import au.com.bytecode.opencsv.CSVReader
 import java.io._
 import com.rojoma.simplearm.util._
-import com.socrata.rows.{ESColumnMap, ESHttpGateway}
 import com.socrata.util.strings.CamelCase
 import java.util.zip.GZIPInputStream
 import com.rojoma.json.ast.JNull
-import com.socrata.es.meta.{ESColumnName, ESIndex}
+import com.socrata.es.meta.{ESColumnMap, ESColumnName, ESIndex}
+import com.socrata.es.gateway.ESHttpGateway
 
 object ESImport {
 
@@ -58,7 +58,7 @@ object ESImport {
    */
   private def columnTypes(fileName: String, mapFile: String, header: Array[String]): Array[ESColumnMap] = {
 
-    import com.socrata.rows.ESColumnMap._
+    import com.socrata.es.meta.ESColumnMap._
 
     val file = new File(mapFile)
     if (file.exists()) {

@@ -4,9 +4,9 @@ import scala.language.existentials
 import com.rojoma.json.codec.JsonCodec
 import com.rojoma.json.ast.{JString, JObject, JValue}
 import com.socrata.soql.typed.ColumnRef
-import com.socrata.soql.adapter.elasticsearch.FacetName
 import com.socrata.soql.environment.FunctionName
 import com.socrata.soql.functions.SoQLFunctions
+import com.socrata.es.soql.query.FacetName
 
 object TermsFacet {
   implicit object jcodec extends JsonCodec[TermsFacet] {

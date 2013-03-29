@@ -6,12 +6,13 @@ import org.apache.commons.cli.PosixParser
 import com.rojoma.simplearm.util._
 import com.socrata.es.exception._
 import com.socrata.injest.ESImport
-import com.socrata.rows.ESHttpGateway
-import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
 import com.socrata.soql.exceptions.SoQLException
-import com.socrata.soql.adapter.SoQLAdapterException
 import java.io.InputStream
 import com.socrata.es.meta.{ESType, ESIndex}
+import com.socrata.es.gateway.ESHttpGateway
+import com.socrata.es.soql.query.ESQuery
+import com.socrata.es.soql.SoQLAdapterException
+import com.socrata.es.soql.parse.ESResultSet
 
 object Main extends App {
 

@@ -1,9 +1,7 @@
 package com.socrata.es.store
 
-import com.socrata.rows.{ESColumnMap, ESHttpGateway, ESGateway}
 import com.socrata.soql.types.{SoQLText, SoQLType, SoQLNumber}
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
-import com.socrata.soql.adapter.elasticsearch.{ESResultSet, ESQuery}
 import com.rojoma.simplearm.util._
 import java.io.InputStream
 import com.rojoma.json.ast.{JNumber, JString, JObject}
@@ -15,6 +13,9 @@ import com.socrata.datacoordinator.id.{CopyId, DatasetId, RowId, ColumnId}
 import com.socrata.es.meta.{ESColumnName, ESType, ESIndex}
 import com.socrata.soql.collection.OrderedMap
 import com.typesafe.config.Config
+import com.socrata.es.gateway.{ESHttpGateway, ESGateway}
+import com.socrata.es.soql.parse.ESResultSet
+import com.socrata.es.soql.query.ESQuery
 
 
 /**

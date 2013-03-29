@@ -5,10 +5,10 @@ import com.socrata.soql.types.{SoQLNumber, SoQLType}
 import com.socrata.soql.collection.{OrderedSet, OrderedMap}
 import com.socrata.soql.environment.ColumnName
 import com.rojoma.json.ast.{JValue, JNumber, JString, JObject}
-import com.socrata.soql.adapter.NotImplementedException
-import com.socrata.soql.adapter.elasticsearch.{ESQuery, FacetName}
 import com.rojoma.json.codec.JsonCodec
 import com.socrata.soql.functions.MonomorphicFunction
+import com.socrata.es.soql.NotImplementedException
+import com.socrata.es.soql.query.{FacetName, ESQuery}
 
 object TermsStatsFacet {
 

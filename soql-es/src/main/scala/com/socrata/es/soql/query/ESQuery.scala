@@ -3,7 +3,7 @@ package com.socrata.es.soql.query
 
 import com.socrata.soql.environment.DatasetContext
 import com.socrata.soql.functions.{SoQLTypeInfo, SoQLFunctionInfo}
-import com.socrata.soql.types.{SoQLType, SoQLBoolean}
+import com.socrata.soql.types.{SoQLAnalysisType, SoQLType, SoQLBoolean}
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.environment.ColumnName
 import com.socrata.soql.SoQLAnalyzer
@@ -16,7 +16,7 @@ import com.socrata.es.gateway.ESGateway
 import com.socrata.es.soql.NotImplementedException
 
 class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Option[BigInt] = Some(1000),
-              context: Option[DatasetContext[SoQLType]] = None) extends SoqlAdapter[String] {
+              context: Option[DatasetContext[SoQLAnalysisType]] = None) extends SoqlAdapter[String] {
 
   import ESQuery._
 
@@ -24,23 +24,23 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
 
   def full(soql: String) = toQuery(dsCtx, soql)
 
-  def select(selection : OrderedMap[ColumnName, CoreExpr[SoQLType]]) = ""
+  def select(selection : OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]]) = ""
 
-  def where(filter: CoreExpr[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef] = Map.empty) =
+  def where(filter: CoreExpr[SoQLAnalysisType], xlateCtx: Map[XlateCtx.Value, AnyRef] = Map.empty) =
     toESFilter(filter, xlateCtx, canScript = true).toString()
 
-  def orderBy(orderBys: Seq[OrderBy[SoQLType]]) =
+  def orderBy(orderBys: Seq[OrderBy[SoQLAnalysisType]]) =
     toESOrderBy(orderBys).toString()
 
-  def groupBy(groupBys: Seq[CoreExpr[SoQLType]], cols: OrderedMap[ColumnName, CoreExpr[SoQLType]]) =
+  def groupBy(groupBys: Seq[CoreExpr[SoQLAnalysisType]], cols: OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]]) =
     toESGroupBy(groupBys, None, cols).toString
 
   def offset(offset: Option[BigInt]) = offset.map(toESOffset).toString
 
   def limit(limit: Option[BigInt]) = limit.map(toESLimit).toString
 
-  private def toQuery(datasetCtx: DatasetContext[SoQLType], soql: String): Tuple2[String, SoQLAnalyzer[SoQLType]#Analysis] = {
-    implicit val ctx: DatasetContext[SoQLType] = datasetCtx
+  private def toQuery(datasetCtx: DatasetContext[SoQLAnalysisType], soql: String): Tuple2[String, SoQLAnalyzer[SoQLAnalysisType]#Analysis] = {
+    implicit val ctx: DatasetContext[SoQLAnalysisType] = datasetCtx
 
     val analysis = analyzer.analyzeFullQuery(soql)
     val xlateCtx: Map[XlateCtx.Value, AnyRef] = Map(XlateCtx.LowercaseStringLiteral -> Boolean.box(true))
@@ -66,7 +66,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
       else analysis.orderBy.map(toESOrderBy)
 
     val esGroup =
-      if (analysis.isGrouped) Some(toESGroupBy(analysis.groupBy.getOrElse(Seq.empty[CoreExpr[SoQLType]]),
+      if (analysis.isGrouped) Some(toESGroupBy(analysis.groupBy.getOrElse(Seq.empty[CoreExpr[SoQLAnalysisType]]),
         analysis.orderBy, analysis.selection, analysis.offset, analysis.limit))
       else None
 
@@ -84,19 +84,19 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     Tuple2(esObject.toString, analysis) //.replace("\n", " ")
   }
 
-  private def andWhereSearch(whereOpt: Option[CoreExpr[SoQLType]], searchOpt: Option[String]): Option[CoreExpr[SoQLType]] = {
+  private def andWhereSearch(whereOpt: Option[CoreExpr[SoQLAnalysisType]], searchOpt: Option[String]): Option[CoreExpr[SoQLAnalysisType]] = {
 
     val lostPos = new SoQLPosition(0, 0, "", 0)
 
     def searchToExpr(search: String) = {
-      FunctionCall[SoQLType](
+      FunctionCall[SoQLAnalysisType](
         ESFunction.Search,
-        Seq(StringLiteral(search, SoQLType)(lostPos).asInstanceOf[CoreExpr[SoQLType]]))(lostPos, lostPos)
+        Seq(StringLiteral(search, SoQLType)(lostPos).asInstanceOf[CoreExpr[SoQLAnalysisType]]))(lostPos, lostPos)
     }
 
-    def and(lhs: CoreExpr[SoQLType], rhs: CoreExpr[SoQLType]) = {
+    def and(lhs: CoreExpr[SoQLAnalysisType], rhs: CoreExpr[SoQLAnalysisType]) = {
       val fAnd = new MonomorphicFunction(SoQLFunctions.And.name, Seq(SoQLBoolean, SoQLBoolean), None, SoQLBoolean)
-      FunctionCall[SoQLType](fAnd, Seq(lhs, rhs))(lostPos, lostPos)
+      FunctionCall[SoQLAnalysisType](fAnd, Seq(lhs, rhs))(lostPos, lostPos)
     }
 
     (whereOpt, searchOpt) match {
@@ -115,7 +115,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
 
   private def toESLimit(limit: BigInt) = JNumber(limit)
 
-  private def toESOrderBy(orderBys: Seq[OrderBy[SoQLType]]): JValue = {
+  private def toESOrderBy(orderBys: Seq[OrderBy[SoQLAnalysisType]]): JValue = {
     JArray(orderBys.map { ob =>
       ob.expression match {
         case col: ColumnRef[_] =>
@@ -126,9 +126,9 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     })
   }
 
-  private def toESGroupBy(groupBys: Seq[CoreExpr[SoQLType]],
-                          orderBys: Option[Seq[OrderBy[SoQLType]]],
-                          cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
+  private def toESGroupBy(groupBys: Seq[CoreExpr[SoQLAnalysisType]],
+                          orderBys: Option[Seq[OrderBy[SoQLAnalysisType]]],
+                          cols: OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]],
                           offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
     val lim = if (limit.isDefined) limit else defaultLimit
@@ -144,8 +144,8 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     }
   }
 
-  private def toImpliedGroupFacet(cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
-                                  orderBys: Option[Seq[OrderBy[SoQLType]]],
+  private def toImpliedGroupFacet(cols: OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]],
+                                  orderBys: Option[Seq[OrderBy[SoQLAnalysisType]]],
                                   offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
     val esGroupBys = cols.collect {
@@ -157,7 +157,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     esGroupBys.fold(JObject(Map.empty))((jo1, jo2) => JObject(jo1.toMap ++ jo2.toMap))
   }
 
-  private def toESFilter(filter: CoreExpr[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
+  private def toESFilter(filter: CoreExpr[SoQLAnalysisType], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     ESCoreExpr(filter).toFilter(xlateCtx, level, canScript)
   }
 }
@@ -172,7 +172,7 @@ object ESQuery {
 
   private val analyzer = new SoQLAnalyzer(SoQLTypeInfo, SoQLFunctionInfo)
 
-  val AggregateFunctions: Set[com.socrata.soql.functions.Function[SoQLType]] =
+  val AggregateFunctions: Set[com.socrata.soql.functions.Function[SoQLAnalysisType]] =
     Set(SoQLFunctions.Max, SoQLFunctions.Min, SoQLFunctions.Count, SoQLFunctions.Sum, SoQLFunctions.Avg)
 
   val AggregateFunctionTermsStatsMap = Map(

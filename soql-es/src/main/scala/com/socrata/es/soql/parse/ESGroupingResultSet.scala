@@ -7,12 +7,12 @@ import annotation.tailrec
 import com.rojoma.json.ast.{JArray, JValue, JObject}
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.SoQLAnalyzer
-import com.socrata.soql.types.SoQLType
+import com.socrata.soql.types.SoQLAnalysisType
 import com.socrata.soql.typed.CoreExpr
 import com.socrata.es.facet.parse.FacetResponseParser
 import com.socrata.es.soql.query.FacetName
 
-class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream: InputStream, charset: Charset)
+class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLAnalysisType]#Analysis, inputStream: InputStream, charset: Charset)
   extends ESPlainResultSet(analysis, inputStream, charset) {
 
   import ESResultSet._
@@ -24,7 +24,7 @@ class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream
   protected val isMultiGroup: Boolean = analysis.groupBy.map(_.size > 1).getOrElse(false)
 
   protected val groupIndexMap = {
-    val exprIndexs = analysis.groupBy.map(_.zipWithIndex).getOrElse(Seq.empty[Tuple2[CoreExpr[SoQLType], Int]])
+    val exprIndexs = analysis.groupBy.map(_.zipWithIndex).getOrElse(Seq.empty[Tuple2[CoreExpr[SoQLAnalysisType], Int]])
     analysis.selection.map { case (colName, expr) =>
       colName -> exprIndexs.find { (exprIdx) => exprIdx._1 == expr }.map { (exprIdx) => exprIdx._2 }
     }

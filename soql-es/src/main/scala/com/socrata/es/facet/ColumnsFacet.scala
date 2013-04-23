@@ -11,7 +11,7 @@ import com.rojoma.json.ast.JObject
 import com.rojoma.json.ast.JString
 import com.socrata.soql.functions.MonomorphicFunction
 import com.rojoma.json.ast.JArray
-import com.socrata.soql.types.SoQLType
+import com.socrata.soql.types.SoQLAnalysisType
 import com.socrata.soql.environment.ColumnName
 import com.socrata.es.soql.NotImplementedException
 import com.socrata.es.soql.query.{FacetName, ESQuery}
@@ -26,9 +26,9 @@ object ColumnsFacet {
 
     def decode(in: JValue): Option[ColumnsFacet] = None // no need for decode
 
-    private def toESGroupByColumns(groupBys: Seq[CoreExpr[SoQLType]],
-                                   orderBys: Option[Seq[OrderBy[SoQLType]]],
-                                   cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
+    private def toESGroupByColumns(groupBys: Seq[CoreExpr[SoQLAnalysisType]],
+                                   orderBys: Option[Seq[OrderBy[SoQLAnalysisType]]],
+                                   cols: OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]],
                                    offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
       val keys = JArray(groupBys.collect { // ignore expression that aren't simple column
@@ -85,9 +85,9 @@ object ColumnsFacet {
 }
 
 case class ColumnsFacet(
-  val groupBys: Seq[CoreExpr[SoQLType]],
-  val orderBys: Option[Seq[OrderBy[SoQLType]]],
-  val cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
+  val groupBys: Seq[CoreExpr[SoQLAnalysisType]],
+  val orderBys: Option[Seq[OrderBy[SoQLAnalysisType]]],
+  val cols: OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]],
   val offset: Option[BigInt] = None,
   val limit: Option[BigInt] = None) extends Facet {
 

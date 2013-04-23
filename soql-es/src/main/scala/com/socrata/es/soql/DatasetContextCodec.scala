@@ -5,15 +5,11 @@ import com.rojoma.json.codec.JsonCodec
 import com.rojoma.json.matcher._
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.environment._
-import com.socrata.soql.types.{SoQLArray, SoQLText, SoQLType}
+import com.socrata.soql.types.{SoQLAnalysisType, SoQLArray, SoQLText, SoQLType}
 import com.socrata.es.meta.ESType
 
-class DatasetContextCodec(resource: Option[String] = None, esType: ESType) extends JsonCodec[DatasetContext[SoQLType]] {
+class DatasetContextCodec(resource: Option[String] = None, esType: ESType) extends JsonCodec[DatasetContext[SoQLAnalysisType]] {
   import DatasetContextCodec._
-
-  implicit val schemalessDatasetContext = new SchemalessDatasetContext {
-    val locale = com.ibm.icu.util.ULocale.ENGLISH
-  }
 
   private val typeVar = Variable[String]()
   private val formatVar = Variable[String]()
@@ -57,11 +53,11 @@ class DatasetContextCodec(resource: Option[String] = None, esType: ESType) exten
     }
   }
 
-  def encode(myObj: DatasetContext[SoQLType]): JValue = {
+  def encode(myObj: DatasetContext[SoQLAnalysisType]): JValue = {
     throw new UnsupportedOperationException
   }
 
-  def decode(jValue: JValue): Option[DatasetContext[SoQLType]] = {
+  def decode(jValue: JValue): Option[DatasetContext[SoQLAnalysisType]] = {
 
     import scala.language.existentials
 
@@ -69,10 +65,10 @@ class DatasetContextCodec(resource: Option[String] = None, esType: ESType) exten
 
     skipToValue(Some(jValue), optPath ++ Seq(esType.raw, "properties")) match {
       case Some(jo : JObject) =>
-        val datasetContext = new DatasetContext[SoQLType] {
+        val datasetContext = new DatasetContext[SoQLAnalysisType] {
           implicit val ctx = this
           val locale = com.ibm.icu.util.ULocale.ENGLISH
-          val colMap = jo.foldLeft(OrderedMap.empty[ColumnName, SoQLType]){(ordMap, kv) =>
+          val colMap = jo.foldLeft(OrderedMap.empty[ColumnName, SoQLAnalysisType]){(ordMap, kv) =>
             ordMap + (ColumnName(kv._1) -> decodeType(kv._2))
           }
           val schema = colMap

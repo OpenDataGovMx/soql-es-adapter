@@ -1,6 +1,6 @@
 package com.socrata.es.store
 
-import com.socrata.soql.types.{SoQLText, SoQLType, SoQLNumber}
+import com.socrata.soql.types.{SoQLAnalysisType, SoQLText, SoQLNumber}
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
 import com.rojoma.simplearm.util._
 import java.io.InputStream
@@ -46,7 +46,7 @@ trait ESSchemaLoader {
   def loadColumnIdNameMap(datasetId: DatasetId, esGateway: ESGateway): ColumnIdMap[ColumnInfoLike] = {
 
     val schemaGw = getColumnGateway(datasetId)
-    val dataContext: DatasetContext[SoQLType] = schemaDataContext(esGateway)
+    val dataContext: DatasetContext[SoQLAnalysisType] = schemaDataContext(esGateway)
     val esIndex = datasetIdToESIndex(datasetId)
     val query = new ESQuery(esIndex.toString, schemaGw, None, Some(dataContext))
     val soql = "select * limit 1000"
@@ -57,7 +57,7 @@ trait ESSchemaLoader {
         val name = JsonCodec.fromJValue[String](jobj("name")).get
         val typ = JsonCodec.fromJValue[String](jobj("type")).get
         val id = new ColumnId(JsonCodec.fromJValue[Long](jobj("id")).get)
-        val columnInfo = UnanchoredColumnInfo(id, name, typ, name, false, false)
+        val columnInfo = UnanchoredColumnInfo(id, ColumnName(name), typ, name, false, false)
         map + (id -> columnInfo)
       }
     }
@@ -69,8 +69,8 @@ trait ESSchemaLoader {
     gw.deleteType()
   }
 
-  private def schemaDataContext(esGateway: ESGateway): DatasetContext[SoQLType] = {
-    new DatasetContext[SoQLType] {
+  private def schemaDataContext(esGateway: ESGateway): DatasetContext[SoQLAnalysisType] = {
+    new DatasetContext[SoQLAnalysisType] {
       implicit val ctx = this
       val columnSchema = OrderedMap(
         ColumnName("name") -> SoQLText,
@@ -81,8 +81,9 @@ trait ESSchemaLoader {
     }
   }
 
-  private def getColumnGateway(datasetId: DatasetId): ESGateway =
+  private def getColumnGateway(datasetId: DatasetId): ESGateway = {
     new ESHttpGateway(datasetId,  ESType("column"), esBaseUrl = config.getString("url"))
+  }
 }
 
 

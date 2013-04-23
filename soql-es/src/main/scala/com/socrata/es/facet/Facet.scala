@@ -3,7 +3,7 @@ package com.socrata.es.facet
 import scala.language.existentials
 import com.rojoma.json.ast.{JObject, JValue}
 import com.socrata.soql.typed.{FunctionCall, CoreExpr, ColumnRef}
-import com.socrata.soql.types.{SoQLType, SoQLText, SoQLNumber}
+import com.socrata.soql.types.{SoQLAnalysisType, SoQLText, SoQLNumber}
 import com.socrata.soql.environment.ColumnName
 
 sealed trait FacetType {
@@ -45,7 +45,7 @@ trait Facet {
 
 object Facet {
 
-  def apply(colName: ColumnName, expr: CoreExpr[SoQLType]): Facet = {
+  def apply(colName: ColumnName, expr: CoreExpr[SoQLAnalysisType]): Facet = {
 
     expr match {
       case FunctionCall(function, Seq()) if function.isAggregate =>

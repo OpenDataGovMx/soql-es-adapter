@@ -52,7 +52,13 @@ object ESColumnMap {
   private val esIdColumnMap = new ESIdColumnMap()
 
   class ESTextLikeColumnMap extends ESColumnMap {
-    def toES(data: Any): Any = JString(data.toString)
+    def toES(data: Any): Any = {
+      data match {
+        case SoQLText(data) => JString(data)
+        case null => JNull
+        case data => JString(data.toString)
+      }
+    }
 
     override def propMap: JValue = JObject(Map(
       "type" -> JString("string"),
@@ -81,11 +87,13 @@ object ESColumnMap {
     override def toES(data: Any): Any =
       try {
         data match {
+          case SoQLNumber(n) =>
+            JNumber(n.doubleValue)
           case x: String =>
-            java.lang.Double.parseDouble(x)
+            JNumber(java.lang.Double.parseDouble(x))
           case _ =>
+            JNull
         }
-        super.toES(data)
       } catch {
         case e: NumberFormatException =>
           JNull
@@ -101,12 +109,12 @@ object ESColumnMap {
 
     override def toES(data: Any): Any =
       try {
-        val vdata = data match {
-          case rowId: RowId => rowId.underlying
-          case id: String => java.lang.Long.parseLong(id)
-          case id => java.lang.Long.parseLong(id.toString)
+        data match {
+          case SoQLID(rowId) => JNumber(rowId)
+          case rowId: RowId => JNumber(rowId.underlying)
+          case id: String => JNumber(java.lang.Long.parseLong(id))
+          case id => JNumber(java.lang.Long.parseLong(id.toString))
         }
-        JNumber(vdata)
       } catch {
         case e: NumberFormatException => JNull
         case e: NullPointerException => JNull
@@ -121,8 +129,9 @@ object ESColumnMap {
       "omit_norms" -> JBoolean(true)
     ))
 
-    def toES(data: Any) = Option(data) match {
-      case Some(str: String) => JBoolean(jl.Boolean.parseBoolean(str))
+    def toES(data: Any) = data match {
+      case SoQLBoolean(bool) => JBoolean(bool)
+      case str: String => JBoolean(jl.Boolean.parseBoolean(str))
       case _ => JNull
     }
   }
@@ -143,6 +152,10 @@ object ESColumnMap {
 
     def toES(data: Any) = {
       data match {
+        case SoQLFixedTimestamp(datetime) =>
+          JString(tsFormat.print(datetime))
+        case SoQLFloatingTimestamp(localDatetime) =>
+          JString(tsFormat.print(localDatetime))
         case Iso8601(s,r) =>
           val localDateTime = ISODateTimeFormat.dateTimeParser.parseLocalDateTime(s)
           JString(tsFormat.print(localDateTime))
@@ -150,7 +163,6 @@ object ESColumnMap {
           val localDateTime = tsParser.parseLocalDateTime(s)
           JString(tsFormat.print(localDateTime))
         case _ => JNull
-
       }
     }
   }
@@ -167,12 +179,15 @@ object ESColumnMap {
     ))
 
     def toES(data: Any) = {
-      Option(data) match {
-        case Some(s: String) =>
-          val dateTime = tsParser.parseDateTime(data.toString)
+      data match {
+        case SoQLFixedTimestamp(datetime) =>
+          JString(tsFormat.print(datetime))
+        case SoQLFloatingTimestamp(localDatetime) =>
+          JString(tsFormat.print(localDatetime))
+        case s: String =>
+          val dateTime = tsParser.parseDateTime(s)
           JString(tsFormat.print(dateTime))
         case _ => JNull
-
       }
     }
   }
@@ -189,6 +204,8 @@ object ESColumnMap {
 
     def toES(data: Any) = {
       data match {
+        case SoQLLocation(lat, lon) =>
+          JString(s"$lat,$lon")
         case fmt(lat, lon) =>
           JString(s"$lat,$lon")
         case _ =>
@@ -211,6 +228,7 @@ object ESColumnMap {
 
     def toES(data: Any) = {
       data match {
+        case SoQLObject(jObject) => jObject
         case json: String => json
         case _ => JNull
       }
@@ -231,6 +249,7 @@ object ESColumnMap {
 
     def toES(data: Any) = {
       data match {
+        case SoQLArray(jArray) => jArray
         case json: String => json
         case _ => JNull
       }

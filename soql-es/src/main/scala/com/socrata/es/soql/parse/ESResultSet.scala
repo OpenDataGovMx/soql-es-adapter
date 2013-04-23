@@ -8,7 +8,7 @@ import com.rojoma.json.ast.{JValue, JObject}
 import com.rojoma.json.codec.JsonCodec
 import com.rojoma.json.codec.JsonCodec._
 import com.socrata.soql.SoQLAnalyzer
-import com.socrata.soql.types.SoQLType
+import com.socrata.soql.types.SoQLAnalysisType
 
 
 class ESJsonBadParse(event: JsonEvent, expect: JsonEvent) extends
@@ -26,7 +26,7 @@ trait ESResultSet {
   def rowStream(): Tuple2[Option[Long], Stream[JObject]]
 }
 
-class ESPlainResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream: InputStream, charset: Charset) extends ESResultSet {
+class ESPlainResultSet(analysis: SoQLAnalyzer[SoQLAnalysisType]#Analysis, inputStream: InputStream, charset: Charset) extends ESResultSet {
 
   import ESResultSet._
 
@@ -83,7 +83,7 @@ class ESPlainResultSet(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream: I
 
 object ESResultSet {
 
-  def parser(analysis: SoQLAnalyzer[SoQLType]#Analysis, inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8.charSet): ESResultSet =
+  def parser(analysis: SoQLAnalyzer[SoQLAnalysisType]#Analysis, inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8.charSet): ESResultSet =
     if (analysis.isGrouped) new ESGroupingResultSet(analysis, inputStream, charset)
     else new ESPlainResultSet(analysis, inputStream, charset)
 

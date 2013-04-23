@@ -8,7 +8,7 @@ import com.socrata.soql.collection.OrderedMap
 import com.socrata.es.meta.{ESColumnMap, ESColumnName, DatasetMeta}
 import java.io.InputStream
 
-class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) extends ESGateway {
+class ESTestGateway(datasetContext: Option[DatasetContext[SoQLAnalysisType]] = None) extends ESGateway {
 
   def ensureIndex() = throw new UnsupportedOperationException
 
@@ -40,7 +40,7 @@ class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) ext
     throw new UnsupportedOperationException
   }
 
-  def getDataContext(): DatasetContext[SoQLType] =
+  def getDataContext(): DatasetContext[SoQLAnalysisType] =
     datasetContext.getOrElse(ESTestGateway.datasetCtx)
 
   def getDatasetMeta(): Option[DatasetMeta] = { throw new UnsupportedOperationException }
@@ -52,7 +52,7 @@ class ESTestGateway(datasetContext: Option[DatasetContext[SoQLType]] = None) ext
 
 object ESTestGateway {
 
-  implicit val datasetCtx = new DatasetContext[SoQLType] {
+  implicit val datasetCtx = new DatasetContext[SoQLAnalysisType] {
     private implicit def ctx = this
     val locale = com.ibm.icu.util.ULocale.ENGLISH
     val schema = OrderedMap(

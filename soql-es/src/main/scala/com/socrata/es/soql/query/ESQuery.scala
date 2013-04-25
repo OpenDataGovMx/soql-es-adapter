@@ -6,7 +6,7 @@ import com.socrata.soql.functions.{SoQLTypeInfo, SoQLFunctionInfo}
 import com.socrata.soql.types.{SoQLAnalysisType, SoQLType, SoQLBoolean}
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.environment.ColumnName
-import com.socrata.soql.SoQLAnalyzer
+import com.socrata.soql.{SoQLAnalysis, SoQLAnalyzer}
 import com.rojoma.json.ast._
 import com.socrata.soql.parsing.SoQLPosition
 import com.socrata.soql.typed.{ColumnRef, CoreExpr, FunctionCall, OrderBy, StringLiteral}
@@ -39,7 +39,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
 
   def limit(limit: Option[BigInt]) = limit.map(toESLimit).toString
 
-  private def toQuery(datasetCtx: DatasetContext[SoQLAnalysisType], soql: String): Tuple2[String, SoQLAnalyzer[SoQLAnalysisType]#Analysis] = {
+  private def toQuery(datasetCtx: DatasetContext[SoQLAnalysisType], soql: String): Tuple2[String, SoQLAnalysis[SoQLAnalysisType]] = {
     implicit val ctx: DatasetContext[SoQLAnalysisType] = datasetCtx
 
     val analysis = analyzer.analyzeFullQuery(soql)
@@ -95,7 +95,7 @@ class ESQuery(val resource: String, val esGateway: ESGateway, defaultLimit: Opti
     }
 
     def and(lhs: CoreExpr[SoQLAnalysisType], rhs: CoreExpr[SoQLAnalysisType]) = {
-      val fAnd = new MonomorphicFunction(SoQLFunctions.And.name, Seq(SoQLBoolean, SoQLBoolean), None, SoQLBoolean)
+      val fAnd = new MonomorphicFunction("and", SoQLFunctions.And.name, Seq(SoQLBoolean, SoQLBoolean), None, SoQLBoolean)
       FunctionCall[SoQLAnalysisType](fAnd, Seq(lhs, rhs))(lostPos, lostPos)
     }
 

@@ -7,7 +7,7 @@ import annotation.tailrec
 import com.rojoma.json.ast.{JValue, JObject}
 import com.rojoma.json.codec.JsonCodec
 import com.rojoma.json.codec.JsonCodec._
-import com.socrata.soql.SoQLAnalyzer
+import com.socrata.soql.{SoQLAnalysis, SoQLAnalyzer}
 import com.socrata.soql.types.SoQLAnalysisType
 
 
@@ -26,7 +26,7 @@ trait ESResultSet {
   def rowStream(): Tuple2[Option[Long], Stream[JObject]]
 }
 
-class ESPlainResultSet(analysis: SoQLAnalyzer[SoQLAnalysisType]#Analysis, inputStream: InputStream, charset: Charset) extends ESResultSet {
+class ESPlainResultSet(analysis: SoQLAnalysis[SoQLAnalysisType], inputStream: InputStream, charset: Charset) extends ESResultSet {
 
   import ESResultSet._
 
@@ -83,7 +83,7 @@ class ESPlainResultSet(analysis: SoQLAnalyzer[SoQLAnalysisType]#Analysis, inputS
 
 object ESResultSet {
 
-  def parser(analysis: SoQLAnalyzer[SoQLAnalysisType]#Analysis, inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8.charSet): ESResultSet =
+  def parser(analysis: SoQLAnalysis[SoQLAnalysisType], inputStream: InputStream, charset: Charset = scala.io.Codec.UTF8.charSet): ESResultSet =
     if (analysis.isGrouped) new ESGroupingResultSet(analysis, inputStream, charset)
     else new ESPlainResultSet(analysis, inputStream, charset)
 

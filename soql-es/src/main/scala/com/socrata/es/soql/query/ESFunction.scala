@@ -25,7 +25,7 @@ object ESFunction {
   def apply(functionName: FunctionName) = funMap.get(functionName)
 
   // These functions are not supported in SoQL Analysis yet.
-  val Search = new MonomorphicFunction(SpecialFunctions.Operator("search"), Seq(SoQLText), None, SoQLBoolean)
+  val Search = new MonomorphicFunction("search", SpecialFunctions.Operator("search"), Seq(SoQLText), None, SoQLBoolean)
 
   private val funMap = Map(
     IsNull.name -> isNull _,

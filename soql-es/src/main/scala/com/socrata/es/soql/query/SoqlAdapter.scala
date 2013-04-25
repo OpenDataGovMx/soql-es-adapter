@@ -1,6 +1,6 @@
 package com.socrata.es.soql.query
 
-import com.socrata.soql.SoQLAnalyzer
+import com.socrata.soql.SoQLAnalysis
 import com.socrata.soql.types.SoQLAnalysisType
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.environment.ColumnName
@@ -8,7 +8,7 @@ import com.socrata.soql.typed.{OrderBy, CoreExpr}
 
 trait SoqlAdapter[T] {
 
-  def full(soql: String): Tuple2[T, SoQLAnalyzer[SoQLAnalysisType]#Analysis]
+  def full(soql: String): Tuple2[T, SoQLAnalysis[SoQLAnalysisType]]
 
   def select(selection : OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]]): T
 

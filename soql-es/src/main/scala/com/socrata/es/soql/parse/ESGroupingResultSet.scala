@@ -6,13 +6,13 @@ import java.nio.charset.Charset
 import annotation.tailrec
 import com.rojoma.json.ast.{JArray, JValue, JObject}
 import com.socrata.soql.collection.OrderedMap
-import com.socrata.soql.SoQLAnalyzer
+import com.socrata.soql.SoQLAnalysis
 import com.socrata.soql.types.SoQLAnalysisType
 import com.socrata.soql.typed.CoreExpr
 import com.socrata.es.facet.parse.FacetResponseParser
 import com.socrata.es.soql.query.FacetName
 
-class ESGroupingResultSet(analysis: SoQLAnalyzer[SoQLAnalysisType]#Analysis, inputStream: InputStream, charset: Charset)
+class ESGroupingResultSet(analysis: SoQLAnalysis[SoQLAnalysisType], inputStream: InputStream, charset: Charset)
   extends ESPlainResultSet(analysis, inputStream, charset) {
 
   import ESResultSet._

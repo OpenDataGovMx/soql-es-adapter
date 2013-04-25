@@ -1,4 +1,4 @@
 {
-  "class" : "com.socrata.es.store.ESSecondaryAny",
+  "class" : "com.socrata.es.store.ESSecondarySoQL",
   "name" : "es"
 }

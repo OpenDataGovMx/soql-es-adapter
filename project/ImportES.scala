@@ -16,7 +16,8 @@ object ImportES {
     opencsv,
     rojomaJson,
     simpleArm,
-    socrataUtil
+    socrataUtil,
+    coordinator
   )
 }
 

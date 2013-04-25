@@ -192,30 +192,29 @@ object ESSecondary {
 
   implicit def unanchoredCopyInfoToDatasetMeta(copyInfo: UnanchoredCopyInfo): DatasetMeta = DatasetMeta(copyInfo.copyNumber, copyInfo.dataVersion)
 
-
   private def toESColumn(colInfo: UnanchoredColumnInfo) = {
     (toESColumnName(colInfo) -> ESColumnMap(SoQLType.typesByName(TypeName(colInfo.typeName))))
   }
 
-  def shipToSecondary(datasetName: String, conn: Connection) {
+  def shipToSecondary(rawDatasetId: Long, conn: Connection) {
     val datasetMapReader = new PostgresDatasetMapReader(conn, SoQLTypeContext.typeNamespace, NoopTimingReport)
 
-    for (datasetId <- datasetMapReader.datasetId(datasetName)) {
-      datasetMapReader.datasetInfo(datasetId) match {
-        case Some(datasetInfo) =>
-          val copyInfo: CopyInfo = datasetMapReader.latest(datasetInfo)
-          println( s"logTableName: ${datasetInfo.logTableName}")
-          println( s"copyDataVersion: ${copyInfo.dataVersion}")
-          println( s"copyNumber: ${copyInfo.copyNumber}")
+    val datasetId = new DatasetId(rawDatasetId)
+    datasetMapReader.datasetInfo(datasetId) match {
+      case Some(datasetInfo) =>
+        val copyInfo: CopyInfo = datasetMapReader.latest(datasetInfo)
+        println( s"logTableName: ${datasetInfo.logTableName}")
+        println( s"copyDataVersion: ${copyInfo.dataVersion}")
+        println( s"copyNumber: ${copyInfo.copyNumber}")
 
-          val secondary: ESSecondary[SoQLType, SoQLValue] = new com.socrata.es.store.ESSecondary[SoQLType, SoQLValue](ConfigFactory.empty)
-          val delogger: Delogger[SoQLValue] = new SqlDelogger(conn, datasetInfo.logTableName, () => SoQLRowLogCodec)
+        val secondary: ESSecondary[SoQLType, SoQLValue] = new com.socrata.es.store.ESSecondary[SoQLType, SoQLValue](ConfigFactory.empty)
+        val delogger: Delogger[SoQLValue] = new SqlDelogger(conn, datasetInfo.logTableName, () => SoQLRowLogCodec)
 
-          using(delogger.delog(copyInfo.dataVersion)) { logEventIter =>
-            secondary.version(copyInfo.datasetInfo.systemId, copyInfo.copyNumber, None, logEventIter)
-          }
-        case None =>
-          println(s"cannot find datases $datasetName")
-    }}
+        using(delogger.delog(copyInfo.dataVersion)) { logEventIter =>
+          secondary.version(copyInfo.datasetInfo.systemId, copyInfo.copyNumber, None, logEventIter)
+        }
+      case None =>
+        println(s"cannot find datases ${rawDatasetId}")
+    }
   }
 }

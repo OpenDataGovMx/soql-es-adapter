@@ -7,7 +7,7 @@ object Dependencies {
     val jodaConvert = "1.2"
     val jodaTime = "2.1"
     val opencsv = "2.1"
-    val rojomaJson = "2.2.0"
+    val rojomaJson = "[2.3.0,3.0.0)"
     val scalaCheck_28 = "1.8"
     val scalaCheck_29 = "1.10.0"
     val scalaTest = "1.8"
@@ -40,9 +40,11 @@ object Dependencies {
 
   val typesafeConfig = "com.typesafe" % "config" % versions.typesafeConfig
 
-  val coordinatorlib = "com.socrata" %% "coordinatorlib" % versions.dataCoordinator % "provided"
+  val coordinator = "com.socrata" %% "coordinator" % versions.dataCoordinator // % "provided"
 
-  val coordinatorlibSoql = "com.socrata" %% "coordinatorlib-soql" % versions.dataCoordinator % "provided"
+  val coordinatorlib = "com.socrata" %% "coordinatorlib" % versions.dataCoordinator // % "provided"
 
-  val slf4j = "org.slf4j" % "slf4j-simple"
+  val coordinatorlibSoql = "com.socrata" %% "coordinatorlib-soql" % versions.dataCoordinator // % "provided"
+
+  val slf4j = "org.slf4j" % "slf4j-log4j12"
 }

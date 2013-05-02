@@ -1,7 +1,7 @@
 package com.socrata.es.facet
 
 import com.socrata.soql.typed.{FunctionCall, ColumnRef, OrderBy, CoreExpr}
-import com.socrata.soql.types.{SoQLAnalysisType, SoQLNumber, SoQLType}
+import com.socrata.soql.types.{SoQLType, SoQLNumber}
 import com.socrata.soql.collection.{OrderedSet, OrderedMap}
 import com.socrata.soql.environment.ColumnName
 import com.rojoma.json.ast.{JValue, JNumber, JString, JObject}
@@ -20,8 +20,8 @@ object TermsStatsFacet {
 
     def decode(in: JValue): Option[TermsStatsFacet] = None // no need for decode
 
-    private def toESGroupByTermsStats(groupBys: Seq[CoreExpr[SoQLAnalysisType]], orderBys: Option[Seq[OrderBy[SoQLAnalysisType]]],
-                                      cols: OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]],
+    private def toESGroupByTermsStats(groupBys: Seq[CoreExpr[SoQLType]], orderBys: Option[Seq[OrderBy[SoQLType]]],
+                                      cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
                                       offset: Option[BigInt] = None, limit: Option[BigInt] = None): JObject = {
 
       val esGroupBys = groupBys.collect { // ignore expression that aren't simple column
@@ -71,7 +71,7 @@ object TermsStatsFacet {
       esGroupBys.head
     }
 
-    private def termsStatsOrderBy(orderBys: Option[Seq[OrderBy[SoQLAnalysisType]]]): JString = {
+    private def termsStatsOrderBy(orderBys: Option[Seq[OrderBy[SoQLType]]]): JString = {
 
       def ascend(asc: Boolean) = if (asc) "" else "reverse_"
 
@@ -98,9 +98,9 @@ object TermsStatsFacet {
 }
 
 case class TermsStatsFacet(
-  val groupBys: Seq[CoreExpr[SoQLAnalysisType]],
-  val orderBys: Option[Seq[OrderBy[SoQLAnalysisType]]],
-  val cols: OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]],
+  val groupBys: Seq[CoreExpr[SoQLType]],
+  val orderBys: Option[Seq[OrderBy[SoQLType]]],
+  val cols: OrderedMap[ColumnName, CoreExpr[SoQLType]],
   val offset: Option[BigInt] = None,
   val limit: Option[BigInt] = None) extends Facet {
 

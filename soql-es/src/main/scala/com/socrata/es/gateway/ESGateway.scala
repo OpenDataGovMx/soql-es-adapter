@@ -5,7 +5,7 @@ import com.ning.http.client.{Response, AsyncHttpClient, AsyncHttpClientConfig}
 import com.rojoma.json.ast._
 import java.text.SimpleDateFormat
 import java.util.Date
-import com.socrata.soql.types.SoQLAnalysisType
+import com.socrata.soql.types.{SoQLType}
 import com.rojoma.json.util.JsonUtil
 import com.socrata.es.soql.DatasetContextCodec
 import java.io.InputStream
@@ -31,7 +31,7 @@ trait ESGateway {
 
   def updateEsColumnMapping(cols: Map[ESColumnName, ESColumnMap])
 
-  def getDataContext(): DatasetContext[SoQLAnalysisType]
+  def getDataContext(): DatasetContext[SoQLType]
 
   def deleteIndex()
 
@@ -129,11 +129,11 @@ class ESHttpGateway(val esIndex: ESIndex, val esType: ESType = ESType("data"),
     execute(Client.preparePost("%1$s/_mapping".format(esDsUrl)).setBody(jBody.toString))
   }
 
-  def getDataContext(): DatasetContext[SoQLAnalysisType] = {
+  def getDataContext(): DatasetContext[SoQLType] = {
     val url = "%1$s/_mapping".format(esDsUrl)
     val result = execute(Client.prepareGet(url))
     implicit val dsCtxCodec = new DatasetContextCodec(esType = esType)
-    val dsCtx: DatasetContext[SoQLAnalysisType] = JsonUtil.parseJson(result).get
+    val dsCtx: DatasetContext[SoQLType] = JsonUtil.parseJson(result).get
     dsCtx
   }
 

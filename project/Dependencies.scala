@@ -13,6 +13,8 @@ object Dependencies {
     val scalaTest = "1.8"
     val simpleArm = "1.1.10"
     val socrataUtils = "[0.6.0,0.7.0)"
+    val socrataThirdPartyUtil = "[2.0.0,3.0.0)"
+    val socrataHttpJetty = "[1.3.0,1.4.0)"
     val soqlStdlib = "0.0.16-SNAPSHOT"
     val typesafeConfig = "1.0.0"
     val dataCoordinator = "0.0.1-SNAPSHOT"
@@ -34,7 +36,11 @@ object Dependencies {
 
   val simpleArm = "com.rojoma" %% "simple-arm" % versions.simpleArm
 
+  val socrataHttpJetty = "com.socrata" %% "socrata-http-jetty" % versions.socrataHttpJetty
+
   val socrataUtil = "com.socrata" %% "socrata-utils" % versions.socrataUtils
+
+  val socrataThirdPartyUtil = "com.socrata" %% "socrata-thirdparty-utils" % versions.socrataThirdPartyUtil
 
   val soqlStdlib = "com.socrata" %% "soql-stdlib" % versions.soqlStdlib
 

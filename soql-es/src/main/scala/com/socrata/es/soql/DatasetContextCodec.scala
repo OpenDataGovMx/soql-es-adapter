@@ -8,7 +8,7 @@ import com.socrata.soql.environment._
 import com.socrata.soql.types.{SoQLAnalysisType, SoQLArray, SoQLText, SoQLType}
 import com.socrata.es.meta.ESType
 
-class DatasetContextCodec(resource: Option[String] = None, esType: ESType) extends JsonCodec[DatasetContext[SoQLAnalysisType]] {
+class DatasetContextCodec(resource: Option[String] = None, esType: ESType) extends JsonCodec[DatasetContext[SoQLType]] {
   import DatasetContextCodec._
 
   private val typeVar = Variable[String]()
@@ -53,11 +53,11 @@ class DatasetContextCodec(resource: Option[String] = None, esType: ESType) exten
     }
   }
 
-  def encode(myObj: DatasetContext[SoQLAnalysisType]): JValue = {
+  def encode(myObj: DatasetContext[SoQLType]): JValue = {
     throw new UnsupportedOperationException
   }
 
-  def decode(jValue: JValue): Option[DatasetContext[SoQLAnalysisType]] = {
+  def decode(jValue: JValue): Option[DatasetContext[SoQLType]] = {
 
     import scala.language.existentials
 
@@ -65,10 +65,10 @@ class DatasetContextCodec(resource: Option[String] = None, esType: ESType) exten
 
     skipToValue(Some(jValue), optPath ++ Seq(esType.raw, "properties")) match {
       case Some(jo : JObject) =>
-        val datasetContext = new DatasetContext[SoQLAnalysisType] {
+        val datasetContext = new DatasetContext[SoQLType] {
           implicit val ctx = this
           val locale = com.ibm.icu.util.ULocale.ENGLISH
-          val colMap = jo.foldLeft(OrderedMap.empty[ColumnName, SoQLAnalysisType]){(ordMap, kv) =>
+          val colMap = jo.foldLeft(OrderedMap.empty[ColumnName, SoQLType]){(ordMap, kv) =>
             ordMap + (ColumnName(kv._1) -> decodeType(kv._2))
           }
           val schema = colMap

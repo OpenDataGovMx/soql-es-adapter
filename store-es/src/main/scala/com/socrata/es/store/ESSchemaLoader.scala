@@ -1,6 +1,6 @@
 package com.socrata.es.store
 
-import com.socrata.soql.types.{SoQLAnalysisType, SoQLText, SoQLNumber}
+import com.socrata.soql.types.{SoQLType, SoQLText, SoQLNumber}
 import com.socrata.soql.environment.{ColumnName, DatasetContext}
 import com.rojoma.simplearm.util._
 import java.io.InputStream
@@ -46,7 +46,7 @@ trait ESSchemaLoader {
   def loadColumnIdNameMap(datasetId: DatasetId, esGateway: ESGateway): ColumnIdMap[ColumnInfoLike] = {
 
     val schemaGw = getColumnGateway(datasetId)
-    val dataContext: DatasetContext[SoQLAnalysisType] = schemaDataContext(esGateway)
+    val dataContext: DatasetContext[SoQLType] = schemaDataContext(esGateway)
     val esIndex = datasetIdToESIndex(datasetId)
     val query = new ESQuery(esIndex.toString, schemaGw, None, Some(dataContext))
     val soql = "select * limit 1000"
@@ -69,8 +69,8 @@ trait ESSchemaLoader {
     gw.deleteType()
   }
 
-  private def schemaDataContext(esGateway: ESGateway): DatasetContext[SoQLAnalysisType] = {
-    new DatasetContext[SoQLAnalysisType] {
+  private def schemaDataContext(esGateway: ESGateway): DatasetContext[SoQLType] = {
+    new DatasetContext[SoQLType] {
       implicit val ctx = this
       val columnSchema = OrderedMap(
         ColumnName("name") -> SoQLText,

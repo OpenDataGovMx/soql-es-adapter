@@ -1,5 +1,6 @@
 /target/
-/project/target/
+/*/target/
 /project/project/target/
 /project/boot/
-/.idea/
+/.idea*/
+/project/target/

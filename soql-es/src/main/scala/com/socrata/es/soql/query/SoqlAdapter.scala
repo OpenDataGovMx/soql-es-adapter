@@ -1,22 +1,24 @@
 package com.socrata.es.soql.query
 
 import com.socrata.soql.SoQLAnalysis
-import com.socrata.soql.types.SoQLAnalysisType
+import com.socrata.soql.types.{SoQLType, SoQLAnalysisType}
 import com.socrata.soql.collection.OrderedMap
 import com.socrata.soql.environment.ColumnName
 import com.socrata.soql.typed.{OrderBy, CoreExpr}
 
 trait SoqlAdapter[T] {
 
-  def full(soql: String): Tuple2[T, SoQLAnalysis[SoQLAnalysisType]]
+  def full(soql: String): Tuple2[T, SoQLAnalysis[SoQLType]]
 
-  def select(selection : OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]]): T
+  def full(analysis: SoQLAnalysis[SoQLType]): T
 
-  def where(filter: CoreExpr[SoQLAnalysisType], xlateCtx: Map[XlateCtx.Value, AnyRef]): T
+  def select(selection : OrderedMap[ColumnName, CoreExpr[SoQLType]]): T
 
-  def orderBy(orderBys: Seq[OrderBy[SoQLAnalysisType]]): T
+  def where(filter: CoreExpr[SoQLType], xlateCtx: Map[XlateCtx.Value, AnyRef]): T
 
-  def groupBy(groupBys: Seq[CoreExpr[SoQLAnalysisType]], cols: OrderedMap[ColumnName, CoreExpr[SoQLAnalysisType]]): T
+  def orderBy(orderBys: Seq[OrderBy[SoQLType]]): T
+
+  def groupBy(groupBys: Seq[CoreExpr[SoQLType]], cols: OrderedMap[ColumnName, CoreExpr[SoQLType]]): T
 
   def offset(offset: Option[BigInt]): T
 

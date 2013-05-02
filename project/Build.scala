@@ -18,6 +18,7 @@ object Build extends sbt.Build {
     Project(name, file(name), settings = settings.settings) dependsOn(dependencies: _*)
 
   lazy val soqlES = p("soql-es", SoqlES)
-  lazy val importES = p("import-es", ImportES) dependsOn(soqlES, storeES)
+  lazy val importES = p("import-es", ImportES) dependsOn(storeES)
   lazy val storeES = p("store-es", StoreES) dependsOn(soqlES)
+  lazy val soqlServerES = p("soql-server-es", SoqlServerES) dependsOn(storeES)
 }

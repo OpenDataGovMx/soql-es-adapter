@@ -38,7 +38,7 @@ object ColumnsFacet {
       val aggregateColumns = cols.foldLeft(OrderedSet.empty[ColumnRef[_]]) { (aggregateCols, outputCol) => outputCol match {
         case (columnName, expr) =>
           expr match {
-            case FunctionCall(function, (arg : ColumnRef[_]) :: Nil) if function.isAggregate =>
+            case FunctionCall(function, Seq(arg : ColumnRef[_])) if function.isAggregate =>
               // ColumnRef contains position info which prevents us from directly using ColumnRef equal.
               if (aggregateCols.find(_.column == arg.column).isDefined) aggregateCols
               else aggregateCols + arg
@@ -58,7 +58,7 @@ object ColumnsFacet {
           obs.collect {
             case OrderBy(ColumnRef(column, typ), asc, nullLast) =>
               JString("%s%s".format(column.name, (if (asc) "" else " desc")))
-            case OrderBy(FunctionCall(MonomorphicFunction(function, _), ColumnRef(column, typ) :: Nil), asc, nullLast) if
+            case OrderBy(FunctionCall(MonomorphicFunction(function, _), Seq(ColumnRef(column, typ))), asc, nullLast) if
             (ESQuery.AggregateFunctions.contains(function)) && column.name == aggregateValue.column.name =>
               JString(":%s%s".format(function.name.name, (if (asc) "" else " desc")))
           }

@@ -46,7 +46,7 @@ object ESScriptFunction {
   private def isNull(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: Nil =>
+      case Seq(col: ColumnRef[_]) =>
         ("doc['%s'].empty".format(col.column.name), xlateCtx)
       case _  => throw new NotImplementedException("", fn.position)
     }
@@ -55,7 +55,7 @@ object ESScriptFunction {
   private def isNotNull(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: Nil =>
+      case Seq(col: ColumnRef[_]) =>
         ("!doc['%s'].empty".format(col.column.name), xlateCtx)
       case _  => throw new NotImplementedException("", fn.position)
     }
@@ -64,7 +64,7 @@ object ESScriptFunction {
   private def not(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0):
     Tuple2[String, Map[XlateCtx.Value, AnyRef]] = {
     fn.parameters match {
-      case param :: Nil =>
+      case Seq(param) =>
         val (child, childCtx) = ESCoreExpr(param).toScript(xlateCtx, level+1)
         ("(!%s)".format(child), childCtx)
       case _  => throw new NotImplementedException("", fn.position)
@@ -150,7 +150,7 @@ object ESScriptFunction {
     val childrenCtx = children.foldLeft(xlateCtx) { (x, y) => x ++ y._2}
 
     scriptedParams match {
-      case lhs :: rhs :: Nil =>
+      case Seq(lhs, rhs) =>
         ("(%s %s %s)".format(lhs, scriptFnMap(fn.function.name), rhs), childrenCtx)
       case _  => throw new NotImplementedException("", fn.position)
     }

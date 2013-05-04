@@ -29,7 +29,7 @@ object TermsStatsFacet {
           val aggregateColumns = cols.foldLeft(OrderedSet.empty[ColumnRef[_]]) { (aggregateCols, outputCol) => outputCol match {
             case (columnName, expr) =>
               expr match {
-                case FunctionCall(function, (arg : ColumnRef[_]) :: Nil) if function.isAggregate =>
+                case FunctionCall(function, Seq(arg : ColumnRef[_])) if function.isAggregate =>
                   // ColumnRef contains position info which prevents us from directly using ColumnRef equal.
                   if (aggregateCols.find(_.column == arg.column).isDefined) aggregateCols
                   else aggregateCols + arg
@@ -79,7 +79,7 @@ object TermsStatsFacet {
         obs.collect {
           case OrderBy(ColumnRef(column, typ), asc, nullLast) =>
             s"${ascend(asc)}term"
-          case OrderBy(FunctionCall(MonomorphicFunction(function, _), ColumnRef(column, typ) :: Nil), asc, nullLast) if ESQuery.AggregateFunctions.contains(function) =>
+          case OrderBy(FunctionCall(MonomorphicFunction(function, _), Seq(ColumnRef(column, typ))), asc, nullLast) if ESQuery.AggregateFunctions.contains(function) =>
             s"${ascend(asc)}${ESQuery.AggregateFunctionTermsStatsMap(function.name)}"
           case u => throw new NotImplementedException(s"ordered by $u", u.expression.position)
         }
@@ -87,8 +87,8 @@ object TermsStatsFacet {
 
       obs match {
         case None => JString("term")
-        case Some(h :: Nil) => JString(h)
-        case Some(h :: t) =>
+        case Some(Seq(h)) => JString(h)
+        case Some(Seq(h, t@_*)) =>
           // TODO: Consider ditching termsStats facet in favor of column facet or scripted facet
           throw new NotImplementedException(s"can only handle one order by expression when there is one group by",
             orderBys.get.head.expression.position)

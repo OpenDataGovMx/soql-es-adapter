@@ -55,7 +55,7 @@ object ESFunction {
 
   private def textToFloatingTimestamp(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case StringLiteral(lit, _) :: Nil =>
+      case Seq(StringLiteral(lit, _)) =>
         ESColumnMap(SoQLFloatingTimestamp).toES(lit) match {
           case JString(date) =>
             val dateLit = StringLiteral(date, SoQLType)(fn.position)
@@ -67,7 +67,7 @@ object ESFunction {
 
   private def isNull(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: Nil =>
+      case Seq(col: ColumnRef[_]) =>
         JObject1("missing", JObject1("field", ESCoreExpr(col).toFilter(xlateCtx, level+1)))
       case _  => throw new RequireScriptFilter("Require script filter", fn.position)
     }
@@ -75,7 +75,7 @@ object ESFunction {
 
   private def isNotNull(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: Nil =>
+      case Seq(col: ColumnRef[_]) =>
         JObject1("exists", JObject1("field", ESCoreExpr(col).toFilter(xlateCtx, level+1)))
       case _  => throw new RequireScriptFilter("Require script filter", fn.position)
     }
@@ -83,7 +83,7 @@ object ESFunction {
 
   private def not(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case arg :: Nil =>
+      case Seq(arg) =>
         JObject1("not", ESCoreExpr(arg).toFilter(xlateCtx, zeroStandaloneBooleanLevel(arg, level+1), canScript))
       case _  => throw new RequireScriptFilter("Require script filter", fn.position)
     }
@@ -91,7 +91,7 @@ object ESFunction {
 
   private def in(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: params =>
+      case Seq(col: ColumnRef[_], params@_*) =>
         ESCoreExpr(col).toFilter(xlateCtx, level + 1) match {
           case JString(col) =>
             JObject1("terms", JObject1(col, JArray(params.map( a => ESCoreExpr(a).toFilter(xlateCtx, level+1)))))
@@ -103,7 +103,7 @@ object ESFunction {
 
   private def notIn(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: _ =>
+      case Seq(col: ColumnRef[_], _*) =>
         val fnc = FunctionCall(MonomorphicFunction(SoQLFunctions.In, fn.function.bindings), fn.parameters)(fn.position, fn.functionNamePosition)
         val deNegFn = ESFunctionCall(fnc)
         JObject1("not", deNegFn.toFilter(xlateCtx, level, canScript))
@@ -219,7 +219,7 @@ object ESFunction {
 
   private def like(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case (col: ColumnRef[_]) :: (lit: StringLiteral[_]) :: _ =>
+      case Seq(col: ColumnRef[_], lit: StringLiteral[_], _*) =>
         ESCoreExpr(col).toFilter(xlateCtx, level+1) match {
           case JString(col) =>
             val startsWithRx = """([^\%]+)[\%]""".r
@@ -254,7 +254,7 @@ object ESFunction {
 
   private def search(fn: FunctionCall[_], xlateCtx: Map[XlateCtx.Value, AnyRef], level: Int = 0, canScript: Boolean = false): JValue = {
     fn.parameters match {
-      case StringLiteral(s, _) :: Nil =>
+      case Seq(StringLiteral(s, _)) =>
         JObject(Map("query" ->
           JObject(Map("query_string" ->
             JObject(Map( "default_field" -> JString("_all") , "query" -> JString(s)))

@@ -18,7 +18,7 @@ object SimpleColumnLiteralExpression {
     val colsLitsCpounds = partitionExprs[T](exprs)
     if (isSimpleColumnLiteral(colsLitsCpounds)) {
       val lit2 = colsLitsCpounds._2 match {
-        case h :: h2 :: _ => Some(h2)
+        case Seq(h, h2, _*) => Some(h2)
         case _ => None
       }
       Some(new SimpleColumnLiteralExpression[T](
@@ -36,9 +36,9 @@ object SimpleColumnLiteralExpression {
   private def considerLiteral[T](expr: CoreExpr[T]): Boolean = {
     expr match {
       case _ : TypedLiteral[_] => true
-      case FunctionCall(MonomorphicFunction(SoQLFunctions.TextToFloatingTimestamp, _), arg :: Nil) =>
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.TextToFloatingTimestamp, _), Seq(arg)) =>
         considerLiteral(arg)
-      case FunctionCall(MonomorphicFunction(SoQLFunctions.TextToFixedTimestamp, _), arg :: Nil) =>
+      case FunctionCall(MonomorphicFunction(SoQLFunctions.TextToFixedTimestamp, _), Seq(arg)) =>
         considerLiteral(arg)
       case _ => false
     }

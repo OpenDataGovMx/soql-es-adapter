@@ -11,7 +11,7 @@ object SoQLAnalyzerHelper {
 
   val serializer = new AnalysisSerializer(serializeAnalysisType)
 
-  val deserializer = new AnalysisDeserializer(deserializeType, functionsByIdentity)
+  val deserializer = new AnalysisDeserializer(deserializeType, SoQLFunctions.functionsByIdentity)
 
   private val analyzer = new SoQLAnalyzer(SoQLTypeInfo, SoQLFunctionInfo)
 
@@ -30,10 +30,6 @@ object SoQLAnalyzerHelper {
 
   private def deserializeType(in: CodedInputStream): SoQLType = {
     SoQLType.typesByName(TypeName(in.readString()))
-  }
-
-  private val functionsByIdentity = SoQLFunctions.allFunctions.foldLeft(Map.empty[String, Function[SoQLType]]) { (acc, func) =>
-    acc + (func.identity -> func)
   }
 
   private def toAnalysisType(datasetCtx: DatasetContext[SoQLType]): DatasetContext[SoQLAnalysisType] = {

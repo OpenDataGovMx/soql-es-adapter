@@ -48,7 +48,8 @@ object QueryServer {
 
   private val routerSet = RouterSet(
     ExtractingRouter[HttpService](GET, "/schema")(schema _),
-    ExtractingRouter[HttpService](GET, "/query")(query _)
+    ExtractingRouter[HttpService](GET, "/query")(query _),
+    ExtractingRouter[HttpService](POST, "/query")(query _)
   )
 
   def schema()(req: HttpServletRequest): HttpResponse = {
